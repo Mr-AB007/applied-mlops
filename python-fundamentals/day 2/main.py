@@ -18,4 +18,15 @@ if __name__ == "__main__":
     squares = [x*x  for x in numbers if x > 10]
     print(f"Sqaure numbers: {squares}")
 
+    users = [
+    {"username": "alice_99", "is_active": True, "is_vip": True},
+    {"username": "bob_builder", "is_active": False, "is_vip": True},
+    {"username": "charlie_dev", "is_active": True, "is_vip": False},
+    {"username": "dana_boss", "is_active": True, "is_vip": True},
+    {"username": "evan_cool", "is_active": False, "is_vip": False}
+    ]
+    #Using comprehension filter unique usernames who is active and vip
+    user_names = {user["username"] for user in users if user["is_active"] and user["is_vip"]}
+    print(user_names)
+
     
