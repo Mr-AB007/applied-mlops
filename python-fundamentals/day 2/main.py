@@ -1,4 +1,7 @@
 from utils import is_even,factorial
+
+def greet(name,greeting="Hello")-> str:
+    return f"{greeting} {name}!"
 numbers = [3, 12, 7, 45, 9, 22, 8, 14]
 
 if __name__ == "__main__":  
