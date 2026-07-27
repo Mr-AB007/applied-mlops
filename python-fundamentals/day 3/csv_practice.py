@@ -16,5 +16,5 @@ if __name__ == "__main__":
     with open("score.csv", "r") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            if int(row["score"]) > 85:
+            if int(row["score"]) > 80:
                 print(row["name"], row["score"])
