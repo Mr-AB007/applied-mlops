@@ -33,7 +33,9 @@
   .br { border-right: 1px solid var(--line); }
 
   .topline { display: flex; justify-content: space-between; align-items: center; }
-  .seller-name input { font-size: 22px; font-weight: bold; border-style: dashed; }
+  .seller-name { font-size: 24px; font-weight: bold; letter-spacing: 1px; }
+  .seller-sub { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .seller-addr { margin-top: 3px; line-height: 1.4; }
   .lbl { color: var(--muted); white-space: nowrap; padding-right: 6px; }
   .kv { display: flex; align-items: flex-start; margin: 2px 0; }
   .kv .lbl { min-width: 70px; padding-top: 3px; flex-shrink: 0; }
@@ -92,6 +94,7 @@
   <button class="primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
   <button onclick="saveDraft(true)">💾 Save</button>
   <button onclick="newBill()">📄 New Bill</button>
+  <button onclick="setNextNumber()">🔢 Set Invoice No.</button>
   <button onclick="exportJSON()">⬇️ Export File</button>
   <label class="btn">⬆️ Import File<input type="file" accept=".json" hidden onchange="importJSON(this)"></label>
   <span class="hint">Blue boxes can be edited. Price and totals are worked out for you.</span>
@@ -102,7 +105,7 @@
 
     <!-- GSTIN + copy type -->
     <div class="cell bb topline">
-      <div class="kv" style="width:50%"><span class="lbl"><b>GSTIN :</b></span><input data-k="sellerGstin"></div>
+      <div class="kv" style="width:50%" id="sellerGstinRow"><span class="lbl"><b>GSTIN :</b></span><span id="sellerGstin" style="padding-top:3px"></span></div>
       <div style="width:160px">
         <select data-k="copyType">
           <option>Original Copy</option><option>Duplicate Copy</option><option>Triplicate Copy</option>
@@ -115,9 +118,10 @@
     <!-- Seller | Customer -->
     <div class="row bb">
       <div class="cell br" style="width:55%">
-        <div class="seller-name"><input data-k="sellerName"></div>
-        <textarea data-k="sellerAddress" rows="2" placeholder="Shop address"></textarea>
-        <div class="kv"><span class="lbl">Tel./Email :</span><input data-k="sellerContact"></div>
+        <div class="seller-name" id="sellerName"></div>
+        <div class="seller-sub" id="sellerTagline"></div>
+        <div class="seller-addr" id="sellerAddress"></div>
+        <div class="seller-addr"><span class="lbl">Tel./Email :</span><span id="sellerContact"></span></div>
       </div>
       <div class="cell" style="width:45%">
         <div style="font-weight:bold; margin-bottom:4px">Billed to (Customer)</div>
@@ -130,7 +134,7 @@
 
     <!-- Quote no / date / place -->
     <div class="row bb">
-      <div class="cell br kv" style="width:36%; margin:0"><span class="lbl" style="min-width:0">Quot. No. :</span><input data-k="billNo"></div>
+      <div class="cell br kv" style="width:36%; margin:0"><span class="lbl" style="min-width:0">Invoice No. :</span><input data-k="billNo" readonly style="border:0;background:transparent;font-weight:bold"></div>
       <div class="cell br kv" style="width:30%; margin:0"><span class="lbl" style="min-width:0">Dated :</span><input type="date" data-k="billDate" class="screen-only"><span class="print-only" id="datePrint"></span></div>
       <div class="cell kv" style="width:34%; margin:0"><span class="lbl" style="min-width:0">Place of Supply :</span><input data-k="placeOfSupply"></div>
     </div>
@@ -186,29 +190,61 @@
 </div>
 
 <script>
-const STORE_KEY = 'invoiceMaker.v1';
+const STORE_KEY = 'invoiceMaker.v2';
 
-// Starting values (taken from the sample bill). Change them here if you want different defaults.
+// ---- Your business details (fixed, printed on every bill) ----
+const BUSINESS = {
+  name: 'MITRSETU',
+  tagline: 'Electrical Equipment',
+  address: 'Ayodhya Nagari, Mithila Colony, Digha AIIMS Nahar Road, Pillar No. 262,<br>Danapur Nizamat, Patna, Bihar - 800012',
+  contact: '9241815052 / mitrsetu@gmail.com',
+  gstin: '',             // put your GSTIN here, e.g. '10ABCDE1234F1Z5' (line is hidden while empty)
+  invoicePrefix: 'MS',   // invoice number looks like MS/26-27/0001
+};
+
+const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+
 const DEFAULTS = {
-  sellerGstin: '10BMMPS1688H1ZS',
   copyType: 'Original Copy',
-  docTitle: 'QUOTATION',
-  sellerName: 'ELECTRICAL HUB',
-  sellerAddress: 'BELOW UNION BANK, GOLA ROAD, DANAPUR, PATNA, BIHAR\nNEAR- SONU MARKET, www.electricalhub.in',
-  sellerContact: '8603020500 / anand1981shankar@gmail.com',
+  docTitle: 'TAX INVOICE',
   custName: 'CASH', custAddress: '', custPhone: '', custGstin: '',
-  billNo: 'H/TAX-1934/26-27',
-  billDate: new Date().toISOString().slice(0, 10),
+  billNo: '',
+  billDate: today(),
   placeOfSupply: 'Bihar (10)',
   cgst: 9, sgst: 9, igst: 0,
   notes: '',
-  items: [
-    { desc: 'HW 4.0 MM 180 MTR WIRE HAV BLK', qty: 4,  unit: 'COIL', mrp: 25030, dis: 55 },
-    { desc: 'HW 2.5 MM 180 MTR WIRE HAV BLK', qty: 4,  unit: 'COIL', mrp: 16205, dis: 55 },
-    { desc: 'HW 1.5 MM 180 MTR WIRE HAV BLK', qty: 2,  unit: 'COIL', mrp: 9920,  dis: 55 },
-    { desc: 'HW 1.0 MM 180 MTR WIRE HAV RED', qty: 12, unit: 'COIL', mrp: 6770,  dis: 55 },
-  ],
+  items: [{ desc: '', qty: 1, unit: 'PCS', mrp: 0, dis: 0 }],
 };
+
+// ---- Invoice numbering: PREFIX/FY/0001, restarts at 0001 each financial year (April) ----
+const COUNTER_KEY = 'invoiceMaker.counter';
+function financialYear(dateStr) {
+  const [y, m] = (dateStr || today()).split('-').map(Number);
+  const start = m >= 4 ? y : y - 1;
+  return `${String(start).slice(2)}-${String(start + 1).slice(2)}`;
+}
+function readCounter() {
+  try { return JSON.parse(localStorage.getItem(COUNTER_KEY)) || {}; } catch (e) { return {}; }
+}
+function nextInvoiceNo() {
+  const fy = financialYear(today());
+  const c = readCounter();
+  const last = c.fy === fy ? (c.last || 0) : 0;
+  const n = last + 1;
+  try { localStorage.setItem(COUNTER_KEY, JSON.stringify({ fy, last: n })); } catch (e) {}
+  return `${BUSINESS.invoicePrefix}/${fy}/${String(n).padStart(4, '0')}`;
+}
+function setNextNumber() {
+  const fy = financialYear(today());
+  const c = readCounter();
+  const cur = c.fy === fy ? (c.last || 0) : 0;
+  const ans = prompt(`Invoice number for THIS bill (financial year ${fy}).\nUse this if you already made bills before and want to continue from there.`, cur || 1);
+  const n = parseInt(ans, 10);
+  if (!n || n < 1) return;
+  try { localStorage.setItem(COUNTER_KEY, JSON.stringify({ fy, last: n })); } catch (e) {}
+  document.querySelector('[data-k="billNo"]').value = `${BUSINESS.invoicePrefix}/${fy}/${String(n).padStart(4, '0')}`;
+  saveDraft(false);
+}
 
 const fmt = n => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = v => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
@@ -258,7 +294,7 @@ function recalc() {
     tr.querySelector('.i-desc-p').textContent = ta.value;
     const amt = r2(price * qty);
     tr.classList.toggle('blank-row', !desc && !amt);
-    tr.querySelector('.sn').textContent = (desc || amt) ? ++sn : '';
+    tr.querySelector('.sn').textContent = ++sn;
     tr.querySelector('.i-price').textContent = fmt(price);
     tr.querySelector('.i-amt').textContent = fmt(amt);
     totalQty += qty; taxable += amt;
@@ -285,7 +321,7 @@ function recalc() {
   set('amountWords', 'Rupees ' + toWords(grand) + ' Only');
   const d = document.querySelector('[data-k="billDate"]').value.split('-');
   set('datePrint', d.length === 3 ? `${d[2]}-${d[1]}-${d[0]}` : '');
-  set('signName', document.querySelector('[data-k="sellerName"]').value);
+  set('signName', BUSINESS.name);
 
   // hide tax rows that are 0% when printing
   ['cgst', 'sgst', 'igst'].forEach(k => {
@@ -336,14 +372,12 @@ function saveDraft(showMsg) {
 }
 
 function newBill() {
-  if (!confirm('Start a new bill? Items and customer details will be cleared (shop details are kept).')) return;
+  if (!confirm('Start a new bill? Items and customer details will be cleared and the next invoice number will be used.')) return;
   const cur = collect();
   apply({
-    sellerGstin: cur.sellerGstin, sellerName: cur.sellerName, sellerAddress: cur.sellerAddress,
-    sellerContact: cur.sellerContact, docTitle: cur.docTitle, placeOfSupply: cur.placeOfSupply,
+    docTitle: cur.docTitle, placeOfSupply: cur.placeOfSupply,
     cgst: cur.cgst, sgst: cur.sgst, igst: cur.igst, notes: cur.notes,
-    custName: '', billNo: '', billDate: new Date().toISOString().slice(0, 10),
-    items: [{ desc: '', qty: 1, unit: 'PCS', mrp: 0, dis: 0 }],
+    billNo: nextInvoiceNo(), billDate: today(),
   });
   saveDraft(false);
 }
@@ -370,9 +404,18 @@ function importJSON(input) {
 document.addEventListener('input', () => { recalc(); saveDraft(false); });
 document.addEventListener('change', () => { recalc(); saveDraft(false); });
 
+document.getElementById('sellerName').textContent = BUSINESS.name;
+document.getElementById('sellerTagline').textContent = BUSINESS.tagline;
+document.getElementById('sellerAddress').innerHTML = BUSINESS.address;
+document.getElementById('sellerContact').textContent = BUSINESS.contact;
+document.getElementById('sellerGstin').textContent = BUSINESS.gstin;
+document.getElementById('sellerGstinRow').style.visibility = BUSINESS.gstin ? 'visible' : 'hidden';
+
 let saved = null;
 try { saved = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) {}
-apply(saved || DEFAULTS);
+// Opening the app always uses today's date; a bill continues with its number, a fresh start gets the next one.
+apply({ ...(saved || {}), billDate: today(), billNo: (saved && saved.billNo) || nextInvoiceNo() });
+saveDraft(false);
 </script>
 </body>
 </html>
