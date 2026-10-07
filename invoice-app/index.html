@@ -36,6 +36,8 @@
   .seller-name { font-size: 24px; font-weight: bold; letter-spacing: 1px; }
   .seller-sub { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
   .seller-addr { margin-top: 3px; line-height: 1.4; }
+  #sellerAddress { font-size: 11.5px; }
+  #sellerAddress span { display: block; white-space: nowrap; }
   .lbl { color: var(--muted); white-space: nowrap; padding-right: 6px; }
   .kv { display: flex; align-items: flex-start; margin: 2px 0; }
   .kv .lbl { min-width: 70px; padding-top: 3px; flex-shrink: 0; }
@@ -105,7 +107,7 @@
 
     <!-- GSTIN + copy type -->
     <div class="cell bb topline">
-      <div class="kv" style="width:50%" id="sellerGstinRow"><span class="lbl"><b>GSTIN :</b></span><span id="sellerGstin" style="padding-top:3px"></span></div>
+      <div class="kv" style="width:50%"><span class="lbl" style="min-width:0"><b>GSTIN :</b></span><input data-k="sellerGstin" placeholder="Enter your GSTIN" style="font-weight:bold; text-transform:uppercase"></div>
       <div style="width:160px">
         <select data-k="copyType">
           <option>Original Copy</option><option>Duplicate Copy</option><option>Triplicate Copy</option>
@@ -113,7 +115,7 @@
       </div>
     </div>
 
-    <div class="title-band bb"><input data-k="docTitle"></div>
+    <div class="title-band bb">BILL OF SUPPLY</div>
 
     <!-- Seller | Customer -->
     <div class="row bb">
@@ -196,9 +198,9 @@ const STORE_KEY = 'invoiceMaker.v2';
 const BUSINESS = {
   name: 'MITRSETU',
   tagline: 'Electrical Equipment',
-  address: 'Ayodhya Nagari, Mithila Colony, Digha AIIMS Nahar Road, Pillar No. 262,<br>Danapur Nizamat, Patna, Bihar - 800012',
+  address: 'Ayodhya Nagari, Mithila Colony, Digha AIIMS Nahar Road, Pillar No. 262,<br>Danapur Nizamat, Patna, Bihar - 800012'.split('<br>').map(l => `<span>${l}</span>`).join(''),
   contact: '9241815052 / mitrsetu@gmail.com',
-  gstin: '',             // put your GSTIN here, e.g. '10ABCDE1234F1Z5' (line is hidden while empty)
+  gstin: '',             // optional default; you can also just type it in the GSTIN box on the bill (it is remembered)
   invoicePrefix: 'MS',   // invoice number looks like MS/26-27/0001
 };
 
@@ -206,12 +208,12 @@ const today = () => { const d = new Date(); return new Date(d.getTime() - d.getT
 
 const DEFAULTS = {
   copyType: 'Original Copy',
-  docTitle: 'TAX INVOICE',
+  sellerGstin: BUSINESS.gstin,
   custName: 'CASH', custAddress: '', custPhone: '', custGstin: '',
   billNo: '',
   billDate: today(),
   placeOfSupply: 'Bihar (10)',
-  cgst: 9, sgst: 9, igst: 0,
+  cgst: 0, sgst: 0, igst: 0,   // Bill of Supply: no GST charged
   notes: '',
   items: [{ desc: '', qty: 1, unit: 'PCS', mrp: 0, dis: 0 }],
 };
@@ -354,6 +356,7 @@ function collect() {
   const data = {};
   document.querySelectorAll('[data-k]').forEach(el => data[el.dataset.k] = el.value);
   data.items = readItems();
+  data.billOfSupply = true;
   return data;
 }
 
@@ -375,7 +378,7 @@ function newBill() {
   if (!confirm('Start a new bill? Items and customer details will be cleared and the next invoice number will be used.')) return;
   const cur = collect();
   apply({
-    docTitle: cur.docTitle, placeOfSupply: cur.placeOfSupply,
+    sellerGstin: cur.sellerGstin, placeOfSupply: cur.placeOfSupply,
     cgst: cur.cgst, sgst: cur.sgst, igst: cur.igst, notes: cur.notes,
     billNo: nextInvoiceNo(), billDate: today(),
   });
@@ -408,12 +411,11 @@ document.getElementById('sellerName').textContent = BUSINESS.name;
 document.getElementById('sellerTagline').textContent = BUSINESS.tagline;
 document.getElementById('sellerAddress').innerHTML = BUSINESS.address;
 document.getElementById('sellerContact').textContent = BUSINESS.contact;
-document.getElementById('sellerGstin').textContent = BUSINESS.gstin;
-document.getElementById('sellerGstinRow').style.visibility = BUSINESS.gstin ? 'visible' : 'hidden';
 
 let saved = null;
 try { saved = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) {}
 // Opening the app always uses today's date; a bill continues with its number, a fresh start gets the next one.
+if (saved && !saved.billOfSupply) { saved.cgst = 0; saved.sgst = 0; saved.igst = 0; }  // one-time switch from Tax Invoice
 apply({ ...(saved || {}), billDate: today(), billNo: (saved && saved.billNo) || nextInvoiceNo() });
 saveDraft(false);
 </script>

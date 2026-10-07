@@ -5,7 +5,7 @@ A single offline HTML file for making and printing a GST quotation or invoice. N
 ## How to use (Windows)
 1. Copy `index.html` anywhere, for example to your Desktop.
 2. Double-click it to open it in Chrome or Edge.
-3. Edit the blue boxes: customer billing info, items (Qty, Unit, MRP, Dis %), and GST rates.
+3. Type your GSTIN once in the box at the top (it is remembered). Then edit the blue boxes: customer billing info, items (Qty, Unit, MRP, Dis %), and GST rates.
    The MITRSETU name, address and Tel./Email are fixed. The date is set to today's date each time the app opens.
 4. **PRICE**, **Amount**, CGST/SGST/IGST, round-off, **Grand Total** and *amount in words* update as you type.
 5. Click **Print / Save as PDF**. To print on paper, pick your printer. For a PDF, pick "Save as PDF".
@@ -20,7 +20,7 @@ A single offline HTML file for making and printing a GST quotation or invoice. N
 ## Formula
 - Price = MRP × (1 − Dis% / 100)
 - Amount = Price × Qty
-- Grand Total = Taxable + CGST + SGST + IGST, rounded to the nearest rupee
+- Grand Total = Taxable + CGST + SGST + IGST, rounded to the nearest rupee (GST is 0% by default because the bill is a Bill of Supply)
 
 ## Invoice number
 Format: `MS/26-27/0001`, which is prefix / financial year / running number.
