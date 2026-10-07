@@ -2,6 +2,14 @@
 
 A single offline HTML file for making and printing a GST quotation or invoice. Nothing to install.
 
+## Install as an app (own icon, own window)
+1. Put the whole `invoice-app` folder somewhere permanent, for example `D:\MITRSETU Billing`.
+2. Double-click **Create Desktop Shortcut.bat**.
+3. A **MITRSETU Billing** icon appears on the Desktop and in the Start Menu. It opens the bill maker in its own window, without browser tabs.
+   To pin it, right-click the icon and choose **Pin to taskbar** or **Pin to Start**.
+
+If you move the folder later, run **Create Desktop Shortcut.bat** again.
+
 ## How to use (Windows)
 1. Copy `index.html` anywhere, for example to your Desktop.
 2. Double-click it to open it in Chrome or Edge.
