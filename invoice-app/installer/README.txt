@@ -26,9 +26,17 @@ THE THREE TABS
                   to send it on WhatsApp / email, and "Make Bill from Quote"
                   to turn it into a bill.
 
-PDFs are saved as:
-  <Bills folder>\01-11-2026\MS-26-27-0001.pdf
-  <Bills folder>\Quotations\01-11-2026\QT-26-27-0001.pdf
+PDFs are saved with the customer name and number:
+  <Bills folder>\01-11-2026\DEEPAK_MS-26-27-0001.pdf
+  <Bills folder>\Quotations\01-11-2026\RAHUL KUMAR_QT-26-27-0001.pdf
+
+OPEN A SAVED BILL
+  Click "Open Bill (PDF)" and pick a PDF saved by this app. All details are
+  filled in again. Then choose:
+  - "Open this bill to correct / reprint" (keeps the same number), or
+  - "New GST Invoice / New Non-GST Bill / New Quotation" with the same
+    customer and items (gets the next number).
+  (PDFs made by older versions of the app cannot be opened this way.)
 
 UPDATING
   Extract the new zip and double-click INSTALL.bat again.

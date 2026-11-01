@@ -124,6 +124,20 @@
                             box-shadow: 0 4px 16px rgba(0,0,0,.25); display: flex; flex-direction: column; overflow: hidden; }
   details.menu .menu-list button { background: #fff; color: #23324a; border-radius: 0; text-align: left; padding: 10px 14px; }
   details.menu .menu-list button:hover { background: #eef3fb; }
+  .dlg { position: fixed; inset: 0; z-index: 60; background: rgba(15, 25, 45, .6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .dlg-box { background: #fff; border-radius: 10px; padding: 20px; width: 420px; max-width: 100%; display: flex; flex-direction: column; gap: 8px;
+             box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+  .dlg-box h3 { margin: 0; color: #1f3b6e; font-size: 18px; }
+  .dlg-box p { margin: 0 0 6px; color: #555; }
+  .dlg-box button { text-align: left; border: 1px solid #c9d3e3; background: #f5f8fd; color: #1f3b6e; border-radius: 6px; padding: 10px 12px;
+                    font-size: 14px; font-weight: bold; cursor: pointer; }
+  .dlg-box button:hover { background: #e6eef9; }
+  .dlg-box button small { display: block; font-weight: normal; color: #666; margin-top: 2px; }
+  .dlg-box .dlg-main { background: #1f3b6e; color: #fff; border-color: #1f3b6e; }
+  .dlg-box .dlg-main small { color: #d5def0; }
+  .dlg-box .dlg-main:hover { background: #29497f; }
+  .dlg-sub { font-size: 12px; color: #666; margin-top: 6px; }
+  .dlg-box .dlg-cancel { background: none; border: 0; color: #666; text-align: center; font-weight: normal; }
   .preview-bar button.share { background: #25d366; color: #fff; }
 
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #23324a; color: #fff;
@@ -150,7 +164,7 @@
     </div>
   </details>
   <button onclick="exportJSON()">⬇️ Export File</button>
-  <label class="btn">⬆️ Import File<input type="file" accept=".json" hidden onchange="importJSON(this)"></label>
+  <label class="btn">📂 Open Bill (PDF)<input type="file" accept=".pdf,.json" hidden onchange="openBillFile(this)"></label>
   <span class="hint">Blue boxes can be edited. Price and totals are worked out for you.</span>
 </div>
 
@@ -342,14 +356,14 @@ function addItem(item = { desc: '', hsn: '', qty: 1, unit: 'PCS', mrp: 0, dis: 0
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td class="col-sn sn"></td>
-    <td><textarea class="i-desc screen-only" rows="1" placeholder="Item name">${esc(item.desc)}</textarea><span class="print-only i-desc-p"></span></td>
+    <td><textarea class="i-desc screen-only" rows="1" placeholder="ITEM NAME">${esc(String(item.desc || '').toUpperCase())}</textarea><span class="print-only i-desc-p"></span></td>
     <td><input class="i-hsn" value="${esc(item.hsn)}" placeholder="Code"></td>
-    <td class="num"><input class="i-qty" type="number" step="any" min="0" value="${esc(item.qty)}"></td>
+    <td class="num"><input class="i-qty" type="text" inputmode="decimal" value="${esc(item.qty)}"></td>
     <td><input class="i-unit" value="${esc(item.unit)}"></td>
-    <td class="num"><input class="i-mrp screen-only" type="number" step="any" min="0" value="${esc(item.mrp)}"><span class="print-only i-mrp-p"></span></td>
-    <td class="num"><input class="i-dis" type="number" step="any" min="0" max="100" value="${esc(item.dis)}"></td>
+    <td class="num"><input class="i-mrp screen-only" type="text" inputmode="decimal" value="${esc(item.mrp)}"><span class="print-only i-mrp-p"></span></td>
+    <td class="num"><input class="i-dis" type="text" inputmode="decimal" value="${esc(item.dis)}"></td>
     <td class="num i-price"></td>
-    <td class="num gst-col"><input class="i-gst" type="number" step="any" min="0" max="100" value="${esc(gst)}"></td>
+    <td class="num gst-col"><input class="i-gst" type="text" inputmode="decimal" value="${esc(gst)}"></td>
     <td class="num i-amt"></td>
     <td class="col-del"><button class="del-btn" title="Remove item">✕</button></td>`;
   tr.querySelector('.del-btn').onclick = () => { tr.remove(); recalc(); };
@@ -535,21 +549,84 @@ function switchType(t) {
   loadDraft(gstin ? { sellerGstin: gstin } : {});
 }
 
+// Start a new document of type `target` with the customer and items from `src` (gets the next number, today's date).
+function newFrom(src, target) {
+  saveDraft(false);
+  docType = target;
+  try { localStorage.setItem(TYPE_KEY, target); } catch (e) {}
+  apply({
+    sellerGstin: src.sellerGstin || document.querySelector('[data-k="sellerGstin"]').value,
+    placeOfSupply: src.placeOfSupply, supplyType: src.supplyType, withGst: src.withGst,
+    custName: src.custName, custAddress: src.custAddress, custPhone: src.custPhone, custGstin: src.custGstin,
+    items: src.items, notes: target === src.docType ? src.notes : '',
+    billNo: nextNo(), billDate: today(), validTill: plusDays(QUOTE_VALID_DAYS),
+  });
+  saveDraft(false);
+}
+
 // Turn the current quotation into a new GST or Non-GST bill.
 function convertQuote(target) {
   document.getElementById('convertMenu').open = false;
   const q = collect(), t = DOC_TYPES[target];
   if (!confirm(`Make a new ${t.name} from quotation ${q.billNo}?\nThe customer and items are copied. The ${t.name} you were working on will be replaced by this new one.`)) return;
-  saveDraft(false);
-  docType = target;
-  try { localStorage.setItem(TYPE_KEY, target); } catch (e) {}
-  apply({
-    sellerGstin: q.sellerGstin, placeOfSupply: q.placeOfSupply, supplyType: q.supplyType,
-    custName: q.custName, custAddress: q.custAddress, custPhone: q.custPhone, custGstin: q.custGstin,
-    items: q.items, billNo: nextNo(), billDate: today(),
-  });
-  saveDraft(false);
+  newFrom(q, target);
   toast(`${t.name} ${document.querySelector('[data-k="billNo"]').value} made from quotation ${q.billNo}`);
+}
+
+// ---------- Open a saved bill (PDF made by this app, or an exported .json) ----------
+const BILL_DATA_TAG = 'MITRSETU-BILL:';
+function toBase64(str) {
+  const bytes = new TextEncoder().encode(str); let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function fromBase64(b64) {
+  const bin = atob(b64), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+async function readBillFile(file) {
+  if (/\.json$/i.test(file.name)) return JSON.parse(await file.text());
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const m = text.match(/MITRSETU-BILL:([A-Za-z0-9+\/=]+)/);
+  if (!m) throw new Error('old');
+  return JSON.parse(fromBase64(m[1]));
+}
+
+let openedBill = null;
+async function openBillFile(input) {
+  const file = input.files[0]; input.value = '';
+  if (!file) return;
+  try { openedBill = await readBillFile(file); }
+  catch (e) {
+    alert(e.message === 'old'
+      ? 'This PDF does not contain bill details.\nOnly PDFs saved by this version of MITRSETU Billing (or later) can be opened.'
+      : 'That file could not be read.');
+    return;
+  }
+  const d = openedBill, t = DOC_TYPES[d.docType] || DOC_TYPES.nongst;
+  const items = (d.items || []).filter(it => String(it.desc || '').trim()).length;
+  document.getElementById('openTitle').textContent = `${t.name} ${d.billNo || ''}`;
+  document.getElementById('openInfo').textContent = `${d.custName || 'CASH'}  |  ${ddmmyyyy(d.billDate)}  |  ${items} item${items === 1 ? '' : 's'}`;
+  document.getElementById('openEdit').innerHTML = `✏️ Open this ${t.name.toLowerCase()} to correct / reprint<small>keeps number ${esc(d.billNo || '')}</small>`;
+  document.getElementById('openDlg').hidden = false;
+}
+function openAction(act) {
+  document.getElementById('openDlg').hidden = true;
+  const d = openedBill; openedBill = null;
+  if (!d || act === 'cancel') return;
+  if (act === 'edit') {
+    saveDraft(false);
+    docType = DOC_TYPES[d.docType] ? d.docType : 'nongst';
+    try { localStorage.setItem(TYPE_KEY, docType); } catch (e) {}
+    apply(d); saveDraft(false);
+    toast(`Opened ${T().name} ${d.billNo}`);
+  } else {
+    newFrom(d, act);
+    toast(`New ${T().name} ${document.querySelector('[data-k="billNo"]').value} filled from ${d.billNo}`);
+  }
 }
 
 function exportJSON() {
@@ -560,23 +637,6 @@ function exportJSON() {
   a.download = `${docType === 'quote' ? 'quotation' : 'bill'}-${(d.billNo || 'draft').replace(/[^\w-]+/g, '_')}-${(d.custName || 'customer').replace(/[^\w-]+/g, '_')}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
-}
-
-function importJSON(input) {
-  const f = input.files[0]; if (!f) return;
-  const rd = new FileReader();
-  rd.onload = () => {
-    try {
-      const d = JSON.parse(rd.result);
-      if (d.docType && DOC_TYPES[d.docType] && d.docType !== docType) {
-        saveDraft(false); docType = d.docType;
-        try { localStorage.setItem(TYPE_KEY, docType); } catch (e) {}
-      }
-      apply(d); saveDraft(false);
-    } catch (e) { alert('That file could not be read.'); }
-  };
-  rd.readAsText(f);
-  input.value = '';
 }
 
 // ---------- Save PDF into <Bills folder>\<DD-MM-YYYY>\<invoice no>.pdf ----------
@@ -627,9 +687,12 @@ function dateFolderName() {
   const d = document.querySelector('[data-k="billDate"]').value.split('-');
   return d.length === 3 ? `${d[2]}-${d[1]}-${d[0]}` : 'no-date';
 }
+// File name = customer name + number, e.g. "DEEPAK_MS-26-27-0010.pdf" (the number keeps two bills for one customer apart)
 function pdfFileName() {
-  const no = document.querySelector('[data-k="billNo"]').value || 'bill';
-  return no.replace(/[\\/:*?"<>|]+/g, '-') + '.pdf';   // MS/26-27/0001 -> MS-26-27-0001.pdf
+  const clean = s => String(s || '').replace(/[\\/:*?"<>|\r\n\t]+/g, '-').replace(/\s+/g, ' ').trim().replace(/^[.\s]+|[.\s]+$/g, '');
+  const cust = clean(document.querySelector('[data-k="custName"]').value).slice(0, 60) || 'CASH';
+  const no = clean(document.querySelector('[data-k="billNo"]').value) || 'bill';
+  return `${cust}_${no}.pdf`;
 }
 
 // ---------- PDF: drawn directly (sharp text; never depends on window size, zoom or scrolling) ----------
@@ -649,7 +712,8 @@ function makePdfBlob() {
   });
 
   const B = billData(), f = B.f, DT = T(), isQuote = docType === 'quote';
-  doc.setProperties({ title: `${BUSINESS.name} ${DT.name} ${f.billNo || ''}`, author: BUSINESS.name, creator: 'MITRSETU Billing' });
+  doc.setProperties({ title: `${BUSINESS.name} ${DT.name} ${f.billNo || ''}`, author: BUSINESS.name, creator: 'MITRSETU Billing',
+                      keywords: BILL_DATA_TAG + toBase64(JSON.stringify(f)) });
   const L = 10, R = 200, W = R - L, TOP = 10, BOTTOM = 284;
   const LW = 110, GAP = 4, RX = L + LW + GAP, RW = R - RX;     // left / right halves of the info and totals boxes
 
@@ -1013,9 +1077,21 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (!document.getElementById('preview').hidden) printPreview(); else printBill();
   }
-  if (e.key === 'Escape') closePreview();
+  if (e.key === 'Escape') { closePreview(); document.getElementById('openDlg').hidden = true; }
 });
 loadFolder().then(showFolderName);
+
+// Number boxes accept only digits and one dot; product names are typed in CAPITALS.
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.matches('.i-qty, .i-mrp, .i-dis, .i-gst')) {
+    const clean = el.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+    if (clean !== el.value) { const pos = el.selectionStart - (el.value.length - clean.length); el.value = clean; el.setSelectionRange(pos, pos); }
+  } else if (el.matches('.i-desc')) {
+    const up = el.value.toUpperCase();
+    if (up !== el.value) { const a = el.selectionStart, b = el.selectionEnd; el.value = up; el.setSelectionRange(a, b); }
+  }
+}, true);
 
 // ---------- Start ----------
 if (window.BRAND_LOGO) {
@@ -1035,6 +1111,18 @@ document.getElementById('tabs').innerHTML = Object.entries(DOC_TYPES)
 // Opening the app always uses today's date; a document continues with its number, a fresh start gets the next one.
 loadDraft();
 </script>
+<div id="openDlg" class="dlg" hidden>
+  <div class="dlg-box">
+    <h3 id="openTitle"></h3>
+    <p id="openInfo"></p>
+    <button id="openEdit" class="dlg-main" onclick="openAction('edit')"></button>
+    <div class="dlg-sub">Or start a NEW document with the same customer and items (gets the next number):</div>
+    <button onclick="openAction('gst')">🧾 New GST Invoice</button>
+    <button onclick="openAction('nongst')">📄 New Non-GST Bill</button>
+    <button onclick="openAction('quote')">💬 New Quotation</button>
+    <button class="dlg-cancel" onclick="openAction('cancel')">Cancel</button>
+  </div>
+</div>
 <div id="preview" class="preview" hidden>
   <div class="preview-bar">
     <b id="previewTitle"></b>
