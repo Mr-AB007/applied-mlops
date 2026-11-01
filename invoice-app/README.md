@@ -34,3 +34,5 @@ Long bills continue onto more pages ("Page 1 of 2").
 - `vendor/jspdf.umd.min.js`: jsPDF 2.5.2 (MIT). `vendor/pdf-fonts.js`: Liberation Sans (SIL OFL 1.1) and the Rupee sign from DejaVu Sans,
   cut down to the characters a bill needs (no Hindi characters).
 - `installer/`: Windows install / uninstall scripts.
+- Logo: `python make_logo.py <logo.png>` makes `vendor/logo.png` (used in the bill header, as a faint watermark and in the toolbar)
+  and `mitrsetu.ico` (app icon). Then rebuild. Turn the watermark off with `watermark: false` in `BUSINESS`.
