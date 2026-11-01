@@ -165,7 +165,7 @@
   </details>
   <button onclick="exportJSON()">⬇️ Export File</button>
   <label class="btn">📂 Open Bill (PDF)<input type="file" accept=".pdf,.json" hidden onchange="openBillFile(this)"></label>
-  <span class="hint">Blue boxes can be edited. Price and totals are worked out for you.</span>
+  <span class="hint">Blue boxes can be edited. Price and totals are worked out for you. &nbsp;<b id="appVersion"></b></span>
 </div>
 
 <div class="tabs" id="tabs"></div>
@@ -293,6 +293,7 @@ const DOC_TYPES = {
             party: 'QUOTATION FOR', details: 'QUOTATION DETAILS', screenParty: 'Quotation for (Customer)',
             store: 'invoiceMaker.doc.quote', counter: 'invoiceMaker.counter.quote', folder: 'Quotations' },
 };
+const APP_VERSION = '2026.11.01-3';
 const TYPE_KEY = 'invoiceMaker.docType';
 const QUOTE_VALID_DAYS = 15;
 let docType = 'nongst';
@@ -712,7 +713,7 @@ function makePdfBlob() {
   });
 
   const B = billData(), f = B.f, DT = T(), isQuote = docType === 'quote';
-  doc.setProperties({ title: `${BUSINESS.name} ${DT.name} ${f.billNo || ''}`, author: BUSINESS.name, creator: 'MITRSETU Billing',
+  doc.setProperties({ title: pdfFileName().replace(/\.pdf$/i, ''), subject: `${BUSINESS.name} ${DT.name} ${f.billNo || ''}`, author: BUSINESS.name, creator: 'MITRSETU Billing',
                       keywords: BILL_DATA_TAG + toBase64(JSON.stringify(f)) });
   const L = 10, R = 200, W = R - L, TOP = 10, BOTTOM = 284;
   const LW = 110, GAP = 4, RX = L + LW + GAP, RW = R - RX;     // left / right halves of the info and totals boxes
@@ -1056,9 +1057,9 @@ async function printBill() {
       savedMsg = `✔ Saved: ${[root.name, T().folder, folder, name].filter(Boolean).join('\\')}`;
     } else {
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = `${folder}_${name}`; a.click();
+      a.href = URL.createObjectURL(blob); a.download = name; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-      savedMsg = `✔ Saved to Downloads: ${folder}_${name}`;
+      savedMsg = `✔ Saved to Downloads: ${name}`;
     }
     toast(savedMsg);
   } catch (e) {
@@ -1068,7 +1069,8 @@ async function printBill() {
   } finally {
     busy = false; btn.disabled = false; btn.innerHTML = label;
   }
-  if (blob) showPreview(blob, savedMsg); else window.print();
+  if (blob) showPreview(blob, savedMsg);
+  else { const t = document.title; document.title = name.replace(/\.pdf$/i, ''); window.print(); document.title = t; }
 }
 
 // Ctrl+P also saves the PDF; Esc closes the preview
@@ -1094,6 +1096,7 @@ document.addEventListener('input', e => {
 }, true);
 
 // ---------- Start ----------
+document.getElementById('appVersion').textContent = 'Version ' + APP_VERSION;
 if (window.BRAND_LOGO) {
   document.querySelector('link[rel="icon"]').href = window.BRAND_LOGO;
   document.querySelector('.toolbar .logo').style.backgroundImage = `url("${window.BRAND_LOGO}")`;

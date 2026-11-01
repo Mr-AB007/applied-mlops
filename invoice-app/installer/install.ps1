@@ -46,6 +46,21 @@ try {
     $lnk.Save()
   }
 
+  # A taskbar pin made earlier may still open an old copy of the app - point it at this one.
+  $pins = Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar'
+  if (Test-Path $pins) {
+    Get-ChildItem -Path $pins -Filter '*.lnk' | ForEach-Object {
+      $pin = $shell.CreateShortcut($_.FullName)
+      if ($_.Name -like '*MITRSETU*' -or $pin.Arguments -like '*MITRSETU*' -or $pin.TargetPath -like '*MITRSETU*') {
+        if ($browser) { $pin.TargetPath = $browser; $pin.Arguments = "--app=`"$url`"" } else { $pin.TargetPath = $html; $pin.Arguments = '' }
+        $pin.IconLocation = "$icon,0"
+        $pin.WorkingDirectory = $dest
+        $pin.Save()
+        Write-Host "  Updated taskbar pin: $($_.Name)"
+      }
+    }
+  }
+
   Write-Host ''
   Write-Host '  DONE! MITRSETU Billing is installed.' -ForegroundColor Green
   Write-Host "  Installed in : $dest"
