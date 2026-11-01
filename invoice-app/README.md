@@ -19,9 +19,12 @@ Run it again to update the app (drafts, numbers and settings are kept). **UNINST
 ## Using it
 - Type your GSTIN once at the top (it is remembered).
 - **Save PDF & Print** saves the PDF, checks that the whole file was written, then shows a preview with **Print** and **Share** (WhatsApp / email).
-- PDFs go to `<Bills folder>\DD-MM-YYYY\<number>.pdf`, and quotations to `<Bills folder>\Quotations\DD-MM-YYYY\<number>.pdf`.
+- PDFs go to `<Bills folder>\DD-MM-YYYY\<customer>_<number>.pdf`, and quotations to `<Bills folder>\Quotations\DD-MM-YYYY\<customer>_<number>.pdf`.
+- **📂 Open Bill (PDF)**: every PDF carries the bill's data (in its Keywords field). Opening one fills everything in again,
+  either to correct and reprint it (same number) or as a new GST bill, Non-GST bill or quotation (next number). `.json` files open too.
+- Product names are typed in CAPITALS. Number boxes have no arrows and ignore the mouse wheel.
   The Bills folder is chosen the first time you save; change it with **📁 Bills Folder**.
-- **Export / Import File** saves a bill as `.json` and opens it again later.
+- **Export File** saves a bill as `.json` as a backup.
 
 ## How the PDF is made
 The PDF is drawn directly with jsPDF (real text and lines), so it never depends on window size, zoom or scrolling.
