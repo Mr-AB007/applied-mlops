@@ -101,6 +101,30 @@
   .preview iframe { flex: 1; border: 0; background: #525659; }
   .toolbar button:disabled { opacity: .7; cursor: wait; }
 
+  [hidden] { display: none !important; }
+  /* Document type tabs */
+  .tabs { display: flex; gap: 6px; padding: 10px 16px 0; max-width: calc(210mm + 32px); margin: 0 auto; }
+  .tab { border: 0; border-radius: 8px 8px 0 0; padding: 10px 18px; font-size: 14px; font-weight: bold; cursor: pointer;
+         background: #d3dae4; color: #23324a; }
+  .tab:hover { background: #c3ccd9; }
+  .tab.active { background: #1f3b6e; color: #fff; }
+  .tabs + .page { margin-top: 0; border-top: 4px solid #1f3b6e; }
+  body:not(.gst-on) .gst-col, body:not(.gst-on) .gst-only { display: none !important; }
+  body:not(.is-quote) .quote-only { display: none !important; }
+  body.is-quote .not-quote { display: none !important; }
+  .col-gst { width: 46px; }
+  body.gst-on .col-mrp { width: 70px; } body.gst-on .col-price { width: 70px; } body.gst-on .col-amt { width: 84px; }
+  body.gst-on .col-dis { width: 46px; } body.gst-on .col-unit { width: 48px; } body.gst-on .col-hsn { width: 76px; }
+  details.menu { position: relative; }
+  details.menu summary { list-style: none; background: #ffc107; color: #23324a; border-radius: 4px; padding: 7px 12px;
+                         font-weight: bold; cursor: pointer; font-size: 13px; }
+  details.menu summary::-webkit-details-marker { display: none; }
+  details.menu .menu-list { position: absolute; top: 115%; left: 0; z-index: 30; background: #fff; border-radius: 6px; min-width: 190px;
+                            box-shadow: 0 4px 16px rgba(0,0,0,.25); display: flex; flex-direction: column; overflow: hidden; }
+  details.menu .menu-list button { background: #fff; color: #23324a; border-radius: 0; text-align: left; padding: 10px 14px; }
+  details.menu .menu-list button:hover { background: #eef3fb; }
+  .preview-bar button.share { background: #25d366; color: #fff; }
+
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #23324a; color: #fff;
            padding: 10px 16px; border-radius: 6px; font-size: 13px; box-shadow: 0 2px 10px rgba(0,0,0,.3); z-index: 99; }
   .toolbar .folder { font-size: 12px; opacity: .85; }
@@ -115,27 +139,35 @@
   <button onclick="chooseBillsFolder()">📁 Bills Folder</button>
   <span class="folder" id="folderName"></span>
   <button onclick="saveDraft(true)">💾 Save</button>
-  <button onclick="newBill()">📄 New Bill</button>
-  <button onclick="setNextNumber()">🔢 Set Invoice No.</button>
+  <button onclick="newBill()" id="newBtn">📄 New Bill</button>
+  <button onclick="setNextNumber()">🔢 Set Number</button>
+  <details class="menu quote-only" id="convertMenu">
+    <summary>➡️ Make Bill from Quote</summary>
+    <div class="menu-list">
+      <button onclick="convertQuote('gst')">🧾 GST Invoice</button>
+      <button onclick="convertQuote('nongst')">📄 Non-GST Bill</button>
+    </div>
+  </details>
   <button onclick="exportJSON()">⬇️ Export File</button>
   <label class="btn">⬆️ Import File<input type="file" accept=".json" hidden onchange="importJSON(this)"></label>
   <span class="hint">Blue boxes can be edited. Price and totals are worked out for you.</span>
 </div>
 
+<div class="tabs" id="tabs"></div>
 <div class="page">
   <div class="sheet" id="sheet">
 
     <!-- GSTIN + copy type -->
     <div class="cell bb topline">
       <div class="kv" style="width:50%"><span class="lbl" style="min-width:0"><b>GSTIN :</b></span><input data-k="sellerGstin" placeholder="Enter your GSTIN" style="font-weight:bold; text-transform:uppercase"></div>
-      <div style="width:160px">
+      <div style="width:160px" class="not-quote">
         <select data-k="copyType">
           <option>Original Copy</option><option>Duplicate Copy</option><option>Triplicate Copy</option>
         </select>
       </div>
     </div>
 
-    <div class="title-band bb">BILL OF SUPPLY</div>
+    <div class="title-band bb" id="docTitle">BILL OF SUPPLY</div>
 
     <!-- Seller | Customer -->
     <div class="row bb">
@@ -146,7 +178,7 @@
         <div class="seller-addr"><span class="lbl">Tel./Email :</span><span id="sellerContact"></span></div>
       </div>
       <div class="cell" style="width:45%">
-        <div style="font-weight:bold; margin-bottom:4px">Billed to (Customer)</div>
+        <div style="font-weight:bold; margin-bottom:4px" id="partyLabel">Billed to (Customer)</div>
         <div class="kv"><span class="lbl">Name :</span><input data-k="custName" placeholder="Customer name"></div>
         <div class="kv"><span class="lbl">Address :</span><textarea data-k="custAddress" rows="2" placeholder="Customer address"></textarea></div>
         <div class="kv"><span class="lbl">Phone :</span><input data-k="custPhone" placeholder="Mobile number"></div>
@@ -156,9 +188,16 @@
 
     <!-- Quote no / date / place -->
     <div class="row bb">
-      <div class="cell br kv" style="width:36%; margin:0"><span class="lbl" style="min-width:0">Invoice No. :</span><input data-k="billNo" readonly style="border:0;background:transparent;font-weight:bold"></div>
+      <div class="cell br kv" style="width:36%; margin:0"><span class="lbl" style="min-width:0" id="noLabel">Invoice No. :</span><input data-k="billNo" readonly style="border:0;background:transparent;font-weight:bold"></div>
       <div class="cell br kv" style="width:30%; margin:0"><span class="lbl" style="min-width:0">Dated :</span><input type="date" data-k="billDate" class="screen-only"><span class="print-only" id="datePrint"></span></div>
       <div class="cell kv" style="width:34%; margin:0"><span class="lbl" style="min-width:0">Place of Supply :</span><input data-k="placeOfSupply"></div>
+    </div>
+    <div class="row bb doc-extra">
+      <div class="cell br kv quote-only" style="width:36%; margin:0"><span class="lbl" style="min-width:0">Valid till :</span><input type="date" data-k="validTill"></div>
+      <div class="cell br kv quote-only" style="width:30%; margin:0"><span class="lbl" style="min-width:0">Prices :</span>
+        <select data-k="withGst"><option value="no">Without GST</option><option value="yes">With GST</option></select></div>
+      <div class="cell kv gst-only" style="width:34%; margin:0"><span class="lbl" style="min-width:0">GST type :</span>
+        <select data-k="supplyType"><option value="intra">Bihar: CGST + SGST</option><option value="inter">Other state: IGST</option></select></div>
     </div>
 
     <!-- Items -->
@@ -173,6 +212,7 @@
           <th class="col-mrp num">MRP/LP</th>
           <th class="col-dis num">Dis (%)</th>
           <th class="col-price num">PRICE</th>
+          <th class="col-gst num gst-col">GST %</th>
           <th class="col-amt num">Amount (₹)</th>
           <th class="col-del"></th>
         </tr>
@@ -194,10 +234,10 @@
       <div style="width:50%">
         <table class="totals">
           <tr><td>Total Qty.</td><td class="amt" id="tQty"></td></tr>
-          <tr><td>Taxable Amount</td><td class="amt" id="tTaxable"></td></tr>
-          <tr><td>Add : CGST @ <input class="rate" data-k="cgst" type="number" step="0.01" min="0"> %</td><td class="amt" id="tCgst"></td></tr>
-          <tr><td>Add : SGST @ <input class="rate" data-k="sgst" type="number" step="0.01" min="0"> %</td><td class="amt" id="tSgst"></td></tr>
-          <tr><td>Add : IGST @ <input class="rate" data-k="igst" type="number" step="0.01" min="0"> %</td><td class="amt" id="tIgst"></td></tr>
+          <tr><td id="tSubLabel">Sub Total</td><td class="amt" id="tTaxable"></td></tr>
+          <tr id="rowCgst"><td>Add : CGST</td><td class="amt" id="tCgst"></td></tr>
+          <tr id="rowSgst"><td>Add : SGST</td><td class="amt" id="tSgst"></td></tr>
+          <tr id="rowIgst"><td>Add : IGST</td><td class="amt" id="tIgst"></td></tr>
           <tr><td>Rounded Off <span id="tRoundSign"></span></td><td class="amt" id="tRound"></td></tr>
           <tr class="grand"><td>Grand Total ₹</td><td class="amt" id="tGrand"></td></tr>
         </table>
@@ -206,15 +246,13 @@
 
     <!-- Signatures -->
     <div class="bt sign">
-      <div>Receiver's Signature</div>
+      <div class="not-quote">Receiver's Signature</div><div class="quote-only"></div>
       <div class="right">for <b id="signName"></b><br><br><br>Authorised Signatory</div>
     </div>
   </div>
 </div>
 
 <script>
-const STORE_KEY = 'invoiceMaker.v2';
-
 // ---- Your business details (fixed, printed on every bill) ----
 const BUSINESS = {
   name: 'MITRSETU',
@@ -225,10 +263,30 @@ const BUSINESS = {
   ],
   contact: '9241815052 / mitrsetu@gmail.com',
   gstin: '',             // optional default; you can also just type it in the GSTIN box on the bill (it is remembered)
-  invoicePrefix: 'MS',   // invoice number looks like MS/26-27/0001
 };
 
-const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+// ---- The three kinds of document (each has its own tab, draft and number series) ----
+const DOC_TYPES = {
+  gst:    { tab: '🧾 GST Invoice', name: 'GST Invoice', title: 'TAX INVOICE', noLabel: 'Invoice No.', prefix: 'MST', gst: true,
+            party: 'BILLED TO', details: 'INVOICE DETAILS', screenParty: 'Billed to (Customer)',
+            store: 'invoiceMaker.doc.gst', counter: 'invoiceMaker.counter.gst', folder: '' },
+  nongst: { tab: '📄 Non-GST Bill', name: 'Non-GST Bill', title: 'BILL OF SUPPLY', noLabel: 'Invoice No.', prefix: 'MS', gst: false,
+            party: 'BILLED TO', details: 'INVOICE DETAILS', screenParty: 'Billed to (Customer)',
+            store: 'invoiceMaker.v2', counter: 'invoiceMaker.counter', folder: '' },
+  quote:  { tab: '💬 Quotation', name: 'Quotation', title: 'QUOTATION', noLabel: 'Quotation No.', prefix: 'QT', gst: 'optional',
+            party: 'QUOTATION FOR', details: 'QUOTATION DETAILS', screenParty: 'Quotation for (Customer)',
+            store: 'invoiceMaker.doc.quote', counter: 'invoiceMaker.counter.quote', folder: 'Quotations' },
+};
+const TYPE_KEY = 'invoiceMaker.docType';
+const QUOTE_VALID_DAYS = 15;
+let docType = 'nongst';
+try { if (DOC_TYPES[localStorage.getItem(TYPE_KEY)]) docType = localStorage.getItem(TYPE_KEY); } catch (e) {}
+const T = () => DOC_TYPES[docType];
+
+const isoDate = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const today = () => isoDate(new Date());
+const plusDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return isoDate(d); };
+const ddmmyyyy = s => { const d = String(s || '').split('-'); return d.length === 3 ? `${d[2]}-${d[1]}-${d[0]}` : ''; };
 
 const DEFAULTS = {
   copyType: 'Original Copy',
@@ -237,38 +295,37 @@ const DEFAULTS = {
   billNo: '',
   billDate: today(),
   placeOfSupply: 'Bihar (10)',
-  cgst: 0, sgst: 0, igst: 0,   // Bill of Supply: no GST charged
+  supplyType: 'intra', withGst: 'no', validTill: '',
   notes: '',
-  items: [{ desc: '', qty: 1, unit: 'PCS', mrp: 0, dis: 0 }],
+  items: [{ desc: '', qty: 1, unit: 'PCS', mrp: 0, dis: 0, gst: 18 }],
 };
 
-// ---- Invoice numbering: PREFIX/FY/0001, restarts at 0001 each financial year (April) ----
-const COUNTER_KEY = 'invoiceMaker.counter';
+// ---- Numbering: PREFIX/FY/0001 per document type, restarts at 0001 each financial year (April) ----
 function financialYear(dateStr) {
   const [y, m] = (dateStr || today()).split('-').map(Number);
   const start = m >= 4 ? y : y - 1;
   return `${String(start).slice(2)}-${String(start + 1).slice(2)}`;
 }
-function readCounter() {
-  try { return JSON.parse(localStorage.getItem(COUNTER_KEY)) || {}; } catch (e) { return {}; }
+function readCounter(t = T()) {
+  try { return JSON.parse(localStorage.getItem(t.counter)) || {}; } catch (e) { return {}; }
 }
-function nextInvoiceNo() {
+const formatNo = (t, fy, n) => `${t.prefix}/${fy}/${String(n).padStart(4, '0')}`;
+function nextNo(t = T()) {
   const fy = financialYear(today());
-  const c = readCounter();
-  const last = c.fy === fy ? (c.last || 0) : 0;
-  const n = last + 1;
-  try { localStorage.setItem(COUNTER_KEY, JSON.stringify({ fy, last: n })); } catch (e) {}
-  return `${BUSINESS.invoicePrefix}/${fy}/${String(n).padStart(4, '0')}`;
+  const c = readCounter(t);
+  const n = (c.fy === fy ? (c.last || 0) : 0) + 1;
+  try { localStorage.setItem(t.counter, JSON.stringify({ fy, last: n })); } catch (e) {}
+  return formatNo(t, fy, n);
 }
 function setNextNumber() {
-  const fy = financialYear(today());
-  const c = readCounter();
+  const t = T(), fy = financialYear(today());
+  const c = readCounter(t);
   const cur = c.fy === fy ? (c.last || 0) : 0;
-  const ans = prompt(`Invoice number for THIS bill (financial year ${fy}).\nUse this if you already made bills before and want to continue from there.`, cur || 1);
+  const ans = prompt(`${t.noLabel} for THIS ${t.name} (financial year ${fy}).\nUse this to continue from numbers you used before.`, cur || 1);
   const n = parseInt(ans, 10);
   if (!n || n < 1) return;
-  try { localStorage.setItem(COUNTER_KEY, JSON.stringify({ fy, last: n })); } catch (e) {}
-  document.querySelector('[data-k="billNo"]').value = `${BUSINESS.invoicePrefix}/${fy}/${String(n).padStart(4, '0')}`;
+  try { localStorage.setItem(t.counter, JSON.stringify({ fy, last: n })); } catch (e) {}
+  document.querySelector('[data-k="billNo"]').value = formatNo(t, fy, n);
   saveDraft(false);
 }
 
@@ -278,7 +335,8 @@ const r2  = n => Math.round((n + Number.EPSILON) * 100) / 100;
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 // ---------- Items ----------
-function addItem(item = { desc: '', hsn: '', qty: 1, unit: 'PCS', mrp: 0, dis: 0 }) {
+function addItem(item = { desc: '', hsn: '', qty: 1, unit: 'PCS', mrp: 0, dis: 0, gst: 18 }) {
+  const gst = item.gst === undefined || item.gst === '' ? 18 : item.gst;
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td class="col-sn sn"></td>
@@ -289,6 +347,7 @@ function addItem(item = { desc: '', hsn: '', qty: 1, unit: 'PCS', mrp: 0, dis: 0
     <td class="num"><input class="i-mrp screen-only" type="number" step="any" min="0" value="${esc(item.mrp)}"><span class="print-only i-mrp-p"></span></td>
     <td class="num"><input class="i-dis" type="number" step="any" min="0" max="100" value="${esc(item.dis)}"></td>
     <td class="num i-price"></td>
+    <td class="num gst-col"><input class="i-gst" type="number" step="any" min="0" max="100" value="${esc(gst)}"></td>
     <td class="num i-amt"></td>
     <td class="col-del"><button class="del-btn" title="Remove item">✕</button></td>`;
   tr.querySelector('.del-btn').onclick = () => { tr.remove(); recalc(); };
@@ -305,12 +364,13 @@ function readItems() {
     unit: tr.querySelector('.i-unit').value,
     mrp:  tr.querySelector('.i-mrp').value,
     dis:  tr.querySelector('.i-dis').value,
+    gst:  tr.querySelector('.i-gst').value,
   }));
 }
 
 // ---------- Calculation ----------
 function recalc() {
-  let sn = 0, totalQty = 0, taxable = 0;
+  let sn = 0;
   document.querySelectorAll('#itemsBody tr').forEach(tr => {
     const desc = tr.querySelector('.i-desc').value.trim();
     const qty = num(tr.querySelector('.i-qty').value);
@@ -325,36 +385,78 @@ function recalc() {
     tr.querySelector('.sn').textContent = ++sn;
     tr.querySelector('.i-price').textContent = fmt(price);
     tr.querySelector('.i-amt').textContent = fmt(amt);
-    totalQty += qty; taxable += amt;
   });
-  taxable = r2(taxable);
 
-  const v = k => num(document.querySelector(`[data-k="${k}"]`).value);
-  const cgst = r2(taxable * v('cgst') / 100);
-  const sgst = r2(taxable * v('sgst') / 100);
-  const igst = r2(taxable * v('igst') / 100);
-  const exact = taxable + cgst + sgst + igst;
-  const grand = Math.round(exact);
-  const round = r2(grand - exact);
-
+  const B = computeBill(collect(), gstOn());
   const set = (id, t) => document.getElementById(id).textContent = t;
-  set('tQty', totalQty);
-  set('tTaxable', fmt(taxable));
-  set('tCgst', fmt(cgst));
-  set('tSgst', fmt(sgst));
-  set('tIgst', fmt(igst));
-  set('tRoundSign', round >= 0 ? '(+)' : '(−)');
-  set('tRound', fmt(Math.abs(round)));
-  set('tGrand', fmt(grand));
-  set('amountWords', 'Rupees ' + toWords(grand) + ' Only');
-  const d = document.querySelector('[data-k="billDate"]').value.split('-');
-  set('datePrint', d.length === 3 ? `${d[2]}-${d[1]}-${d[0]}` : '');
+  set('tQty', B.totalQty);
+  set('tSubLabel', B.gstOn ? 'Taxable Value' : 'Sub Total');
+  set('tTaxable', fmt(B.sub));
+  set('tCgst', fmt(B.cgst)); set('tSgst', fmt(B.sgst)); set('tIgst', fmt(B.igst));
+  const inter = B.inter;
+  document.getElementById('rowCgst').hidden = !B.gstOn || inter;
+  document.getElementById('rowSgst').hidden = !B.gstOn || inter;
+  document.getElementById('rowIgst').hidden = !B.gstOn || !inter;
+  set('tRoundSign', B.round >= 0 ? '(+)' : '(−)');
+  set('tRound', fmt(Math.abs(B.round)));
+  set('tGrand', fmt(B.grand));
+  set('amountWords', 'Rupees ' + toWords(B.grand) + ' Only');
+  set('datePrint', ddmmyyyy(document.querySelector('[data-k="billDate"]').value));
   set('signName', BUSINESS.name);
+  updateTypeUI();
+}
 
-  // hide tax rows that are 0% when printing
-  ['cgst', 'sgst', 'igst'].forEach(k => {
-    document.querySelector(`[data-k="${k}"]`).closest('tr').classList.toggle('blank-row', v(k) === 0);
+// Is GST charged on the current document?
+function gstOn(f) {
+  const t = T();
+  if (t.gst !== 'optional') return t.gst;
+  const v = f ? f.withGst : document.querySelector('[data-k="withGst"]').value;
+  return v === 'yes';
+}
+
+// All the money maths, used by both the screen and the PDF.
+function computeBill(f, withGst) {
+  const rows = [], groups = new Map();
+  let totalQty = 0, sub = 0, mrpTotal = 0;
+  f.items.forEach(it => {
+    const desc = String(it.desc || '').trim();
+    const qty = num(it.qty), mrp = num(it.mrp);
+    const dis = Math.min(100, Math.max(0, num(it.dis)));
+    const price = r2(mrp * (1 - dis / 100));
+    const amt = r2(price * qty);
+    const gst = withGst ? Math.min(100, Math.max(0, num(it.gst))) : 0;
+    if (!desc && !amt) return;   // empty row
+    rows.push({ desc, hsn: String(it.hsn || '').trim(), qty, unit: String(it.unit || ''), mrp, dis, price, amt, gst });
+    totalQty += qty; sub += amt; mrpTotal += r2(mrp * qty);
+    if (withGst) groups.set(gst, (groups.get(gst) || 0) + amt);
   });
+  sub = r2(sub);
+  const inter = f.supplyType === 'inter';
+  const summary = [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([rate, taxable]) => {
+    taxable = r2(taxable);
+    const half = inter ? 0 : r2(taxable * rate / 200), igst = inter ? r2(taxable * rate / 100) : 0;
+    return { rate, taxable, cgst: half, sgst: half, igst, tax: r2(half * 2 + igst) };
+  });
+  const add = k => r2(summary.reduce((s, g) => s + g[k], 0));
+  const cgst = add('cgst'), sgst = add('sgst'), igst = add('igst');
+  const exact = sub + cgst + sgst + igst;
+  const grand = Math.round(exact);
+  return { rows, totalQty: r2(totalQty), mrpTotal: r2(mrpTotal), discount: r2(mrpTotal - sub), sub, gstOn: !!withGst, inter,
+           summary, cgst, sgst, igst, round: r2(grand - exact), grand };
+}
+
+// Show the right title, labels and columns for the current tab.
+function updateTypeUI() {
+  const t = T();
+  document.body.classList.toggle('gst-on', !!gstOn());
+  document.body.classList.toggle('is-quote', docType === 'quote');
+  document.getElementById('docTitle').textContent = t.title;
+  document.getElementById('noLabel').textContent = t.noLabel + ' :';
+  document.getElementById('partyLabel').textContent = t.screenParty;
+  document.getElementById('newBtn').textContent = docType === 'quote' ? '📄 New Quotation' : '📄 New Bill';
+  document.querySelector('.doc-extra').hidden = docType === 'nongst';
+  document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('active', b.dataset.type === docType));
+  document.title = `${t.name} - ${BUSINESS.name} Billing`;
 }
 
 // Indian numbering: Crore, Lakh, Thousand
@@ -382,7 +484,7 @@ function collect() {
   const data = {};
   document.querySelectorAll('[data-k]').forEach(el => data[el.dataset.k] = el.value);
   data.items = readItems();
-  data.billOfSupply = true;
+  data.docType = docType;
   return data;
 }
 
@@ -396,19 +498,56 @@ function apply(data) {
 }
 
 function saveDraft(showMsg) {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(collect())); if (showMsg) alert('Saved on this computer.'); }
+  try { localStorage.setItem(T().store, JSON.stringify(collect())); if (showMsg) alert('Saved on this computer.'); }
   catch (e) { if (showMsg) alert('Could not save in this browser. Use "Export File" instead.'); }
 }
 
 function newBill() {
-  if (!confirm('Start a new bill? Items and customer details will be cleared and the next invoice number will be used.')) return;
+  const t = T();
+  if (!confirm(`Start a new ${t.name}? Items and customer details will be cleared and the next number will be used.`)) return;
   const cur = collect();
   apply({
-    sellerGstin: cur.sellerGstin, placeOfSupply: cur.placeOfSupply,
-    cgst: cur.cgst, sgst: cur.sgst, igst: cur.igst, notes: cur.notes,
-    billNo: nextInvoiceNo(), billDate: today(),
+    sellerGstin: cur.sellerGstin, placeOfSupply: cur.placeOfSupply, supplyType: cur.supplyType, withGst: cur.withGst,
+    notes: cur.notes, billNo: nextNo(), billDate: today(), validTill: plusDays(QUOTE_VALID_DAYS),
   });
   saveDraft(false);
+}
+
+// Open another tab: its own draft comes back (or a fresh one with the next number).
+function loadDraft(carry = {}) {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(T().store)); } catch (e) {}
+  const d = { ...(saved || {}), ...carry };
+  d.billDate = today();                          // opening always uses today's date
+  if (!d.billNo) d.billNo = nextNo();
+  if (!d.validTill || d.validTill < today()) d.validTill = plusDays(QUOTE_VALID_DAYS);
+  apply(d);
+  saveDraft(false);
+}
+function switchType(t) {
+  if (t === docType || !DOC_TYPES[t]) return;
+  const gstin = document.querySelector('[data-k="sellerGstin"]').value;
+  saveDraft(false);
+  docType = t;
+  try { localStorage.setItem(TYPE_KEY, t); } catch (e) {}
+  loadDraft(gstin ? { sellerGstin: gstin } : {});
+}
+
+// Turn the current quotation into a new GST or Non-GST bill.
+function convertQuote(target) {
+  document.getElementById('convertMenu').open = false;
+  const q = collect(), t = DOC_TYPES[target];
+  if (!confirm(`Make a new ${t.name} from quotation ${q.billNo}?\nThe customer and items are copied. The ${t.name} you were working on will be replaced by this new one.`)) return;
+  saveDraft(false);
+  docType = target;
+  try { localStorage.setItem(TYPE_KEY, target); } catch (e) {}
+  apply({
+    sellerGstin: q.sellerGstin, placeOfSupply: q.placeOfSupply, supplyType: q.supplyType,
+    custName: q.custName, custAddress: q.custAddress, custPhone: q.custPhone, custGstin: q.custGstin,
+    items: q.items, billNo: nextNo(), billDate: today(),
+  });
+  saveDraft(false);
+  toast(`${t.name} ${document.querySelector('[data-k="billNo"]').value} made from quotation ${q.billNo}`);
 }
 
 function exportJSON() {
@@ -416,7 +555,7 @@ function exportJSON() {
   const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `bill-${(d.billNo || 'draft').replace(/[^\w-]+/g, '_')}-${(d.custName || 'customer').replace(/[^\w-]+/g, '_')}.json`;
+  a.download = `${docType === 'quote' ? 'quotation' : 'bill'}-${(d.billNo || 'draft').replace(/[^\w-]+/g, '_')}-${(d.custName || 'customer').replace(/[^\w-]+/g, '_')}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -424,7 +563,16 @@ function exportJSON() {
 function importJSON(input) {
   const f = input.files[0]; if (!f) return;
   const rd = new FileReader();
-  rd.onload = () => { try { apply(JSON.parse(rd.result)); saveDraft(false); } catch (e) { alert('That file could not be read.'); } };
+  rd.onload = () => {
+    try {
+      const d = JSON.parse(rd.result);
+      if (d.docType && DOC_TYPES[d.docType] && d.docType !== docType) {
+        saveDraft(false); docType = d.docType;
+        try { localStorage.setItem(TYPE_KEY, docType); } catch (e) {}
+      }
+      apply(d); saveDraft(false);
+    } catch (e) { alert('That file could not be read.'); }
+  };
   rd.readAsText(f);
   input.value = '';
 }
@@ -486,28 +634,9 @@ function pdfFileName() {
 const C = { navy: [31, 59, 110], navyLight: [234, 239, 248], amber: [255, 193, 7], ink: [33, 37, 41],
             muted: [108, 117, 125], line: [196, 204, 216], zebra: [247, 249, 252], white: [255, 255, 255] };
 
-// Same formulas as the screen (recalc), worked out from the saved form values.
 function billData() {
   const f = collect();
-  const rows = [];
-  let totalQty = 0, sub = 0, mrpTotal = 0;
-  f.items.forEach(it => {
-    const desc = String(it.desc || '').trim();
-    const qty = num(it.qty), mrp = num(it.mrp);
-    const dis = Math.min(100, Math.max(0, num(it.dis)));
-    const price = r2(mrp * (1 - dis / 100));
-    const amt = r2(price * qty);
-    if (!desc && !amt) return;   // empty row
-    rows.push({ desc, hsn: String(it.hsn || '').trim(), qty, unit: String(it.unit || ''), mrp, dis, price, amt });
-    totalQty += qty; sub += amt; mrpTotal += r2(mrp * qty);
-  });
-  sub = r2(sub);
-  const taxes = [['CGST', num(f.cgst)], ['SGST', num(f.sgst)], ['IGST', num(f.igst)]]
-    .filter(([, rate]) => rate > 0).map(([name, rate]) => ({ name, rate, amt: r2(sub * rate / 100) }));
-  const exact = sub + taxes.reduce((s, t) => s + t.amt, 0);
-  const grand = Math.round(exact);
-  return { f, rows, totalQty: r2(totalQty), mrpTotal: r2(mrpTotal), discount: r2(mrpTotal - sub), sub, taxes,
-           round: r2(grand - exact), grand };
+  return { f, ...computeBill(f, gstOn(f)) };
 }
 
 function makePdfBlob() {
@@ -517,8 +646,8 @@ function makePdfBlob() {
     doc.addFileToVFS(file, window.PDF_FONTS[file]); doc.addFont(file, fam, style);
   });
 
-  const B = billData(), f = B.f;
-  doc.setProperties({ title: `${BUSINESS.name} Bill ${f.billNo || ''}`, author: BUSINESS.name, creator: 'MITRSETU Billing' });
+  const B = billData(), f = B.f, DT = T(), isQuote = docType === 'quote';
+  doc.setProperties({ title: `${BUSINESS.name} ${DT.name} ${f.billNo || ''}`, author: BUSINESS.name, creator: 'MITRSETU Billing' });
   const L = 10, R = 200, W = R - L, TOP = 10, BOTTOM = 284;
   const LW = 110, GAP = 4, RX = L + LW + GAP, RW = R - RX;     // left / right halves of the info and totals boxes
 
@@ -568,8 +697,9 @@ function makePdfBlob() {
     font(8.2, 'normal', C.muted); doc.text('Tel./Email :', L, cy);
     font(8.2, 'bold', C.ink); doc.text(BUSINESS.contact, L + 16, cy);
 
-    font(17, 'bold', C.navy); doc.text('BILL OF SUPPLY', R, TOP + 8.6, { align: 'right' });
-    font(8, 'normal', C.muted); doc.text(f.copyType || 'Original Copy', R, TOP + 13.4, { align: 'right' });
+    font(17, 'bold', C.navy); doc.text(DT.title, R, TOP + 8.6, { align: 'right' });
+    font(8, 'normal', C.muted);
+    doc.text(isQuote ? (B.gstOn ? 'Prices with GST' : 'Prices without GST') : (f.copyType || 'Original Copy'), R, TOP + 13.4, { align: 'right' });
     const gstin = String(f.sellerGstin || '').trim().toUpperCase();
     font(9, 'bold', C.ink); doc.text(gstin || '____________________', R, TOP + 21, { align: 'right' });
     const gw = doc.getTextWidth(gstin || '____________________');
@@ -589,13 +719,13 @@ function makePdfBlob() {
     if (addr.length) custRows.push(['Address', addr]);
     if (String(f.custPhone || '').trim()) custRows.push(['Phone', f.custPhone.trim()]);
     if (String(f.custGstin || '').trim()) custRows.push(['GSTIN', f.custGstin.trim().toUpperCase()]);
-    const d = String(f.billDate || '').split('-');
-    const invRows = [['Invoice No.', f.billNo || '', true], ['Date', d.length === 3 ? `${d[2]}-${d[1]}-${d[0]}` : ''],
-                     ['Place of Supply', f.placeOfSupply || '']];
+    const invRows = [[DT.noLabel, f.billNo || '', true], ['Date', ddmmyyyy(f.billDate)]];
+    if (isQuote) invRows.push(['Valid Till', ddmmyyyy(f.validTill)]);
+    invRows.push(['Place of Supply', f.placeOfSupply || '']);
     const rowsH = rs => rs.reduce((h, r) => h + (Array.isArray(r[1]) ? r[1].length : 1) * 4.3 + 1.1, 0);
     const h = Math.max(27, 8.5 + Math.max(rowsH(custRows), rowsH(invRows)) + 1.5);
 
-    [[L, LW, 'BILLED TO', custRows, 18], [RX, RW, 'INVOICE DETAILS', invRows, 26]].forEach(([x, w, title, rs, labW]) => {
+    [[L, LW, DT.party, custRows, 18], [RX, RW, DT.details, invRows, 26]].forEach(([x, w, title, rs, labW]) => {
       stroke(C.line, 0.25); fill(C.navyLight); doc.rect(x, y, w, 6.5, 'FD'); doc.rect(x, y, w, h, 'S');
       font(7.6, 'bold', C.navy); doc.text(title, x + 3, y + 4.4);
       let ry = y + 11.2;
@@ -611,7 +741,13 @@ function makePdfBlob() {
   }
 
   // ---- items table ----
-  const cols = [
+  const cols = B.gstOn ? [
+    { k: 'sn', t: '#', w: 8, a: 'center' }, { k: 'desc', t: 'Description of Goods', w: 0, a: 'left' },
+    { k: 'hsn', t: 'HSN/SAC', w: 17, a: 'center' }, { k: 'qty', t: 'Qty', w: 11, a: 'right' },
+    { k: 'unit', t: 'Unit', w: 11, a: 'center' }, { k: 'mrp', t: 'MRP', w: 19, a: 'right' },
+    { k: 'dis', t: 'Disc %', w: 12, a: 'right' }, { k: 'price', t: 'Rate', w: 19, a: 'right' },
+    { k: 'gst', t: 'GST %', w: 11, a: 'right' }, { k: 'amt', t: 'Taxable (₹)', w: 24, a: 'right' },
+  ] : [
     { k: 'sn', t: '#', w: 8, a: 'center' }, { k: 'desc', t: 'Description of Goods', w: 0, a: 'left' },
     { k: 'hsn', t: 'HSN/SAC', w: 18, a: 'center' }, { k: 'qty', t: 'Qty', w: 12, a: 'right' },
     { k: 'unit', t: 'Unit', w: 12, a: 'center' }, { k: 'mrp', t: 'MRP', w: 21, a: 'right' },
@@ -643,7 +779,7 @@ function makePdfBlob() {
       if (i % 2 === 1) { fill(C.zebra); doc.rect(L, y, W, r.h, 'F'); }
       const ty = y + PAD_V / 2 + 2.9;
       const vals = { sn: String(r.sn), hsn: r.hsn, qty: fmtQty(r.qty), unit: r.unit, mrp: fmt(r.mrp),
-                     dis: r.dis ? String(r2(r.dis)) : '-', price: fmt(r.price), amt: fmt(r.amt) };
+                     dis: r.dis ? String(r2(r.dis)) : '-', price: fmt(r.price), amt: fmt(r.amt), gst: String(r2(r.gst)) };
       cols.forEach(c => {
         if (c.k === 'desc') { r.lines.forEach((l, j) => doc.text(l, at(c), ty + j * LINE_H)); return; }
         doc.setFont('Lib', c.k === 'amt' ? 'bold' : 'normal');
@@ -663,21 +799,51 @@ function makePdfBlob() {
   function totalsLayout() {
     font(9, 'italic'); const words = wrap('Rupees ' + toWords(B.grand) + ' Only', LW - 6);
     font(8.2); const notes = wrap(f.notes, LW - 6);
-    const leftH = 6 + words.length * 4.2 + (notes.length ? 6 + notes.length * 3.8 : 0) + 2;
+    const gstTableH = B.gstOn && B.summary.length ? 5 + 4.4 + B.summary.length * 4.2 + 1 : 0;
+    const leftH = 6 + words.length * 4.2 + gstTableH + (notes.length ? 6 + notes.length * 3.8 : 0) + 2;
     const sumRows = [['Total Qty', fmtQty(B.totalQty)]];
     if (B.discount > 0) sumRows.push(['Total MRP Value', fmt(B.mrpTotal)], ['Less : Discount', '- ' + fmt(B.discount)]);
-    sumRows.push(['Sub Total', fmt(B.sub)]);
-    B.taxes.forEach(t => sumRows.push([`Add : ${t.name} @ ${r2(t.rate)}%`, fmt(t.amt)]));
+    sumRows.push([B.gstOn ? 'Taxable Value' : 'Sub Total', fmt(B.sub)]);
+    if (B.gstOn) {
+      const one = B.summary.length === 1 ? B.summary[0].rate : null;   // show the % only when all items share one rate
+      if (B.inter) sumRows.push([`Add : IGST${one !== null ? ` @ ${r2(one)}%` : ''}`, fmt(B.igst)]);
+      else sumRows.push([`Add : CGST${one !== null ? ` @ ${r2(one / 2)}%` : ''}`, fmt(B.cgst)],
+                        [`Add : SGST${one !== null ? ` @ ${r2(one / 2)}%` : ''}`, fmt(B.sgst)]);
+    }
     sumRows.push([`Round Off (${B.round >= 0 ? '+' : '-'})`, fmt(Math.abs(B.round))]);
     const rightH = sumRows.length * 5.2 + 2 + 9 + (B.discount > 0 ? 5.5 : 0);
-    return { words, notes, sumRows, h: Math.max(leftH, rightH, 30) };
+    return { words, notes, sumRows, gstTableH, h: Math.max(leftH, rightH, 30) };
   }
   function totals(y, T) {
     stroke(C.line, 0.25); doc.rect(L, y, LW, T.h, 'S');
     font(7.6, 'bold', C.navy); doc.text('AMOUNT IN WORDS', L + 3, y + 4.8);
     font(9, 'italic', C.ink); T.words.forEach((l, i) => doc.text(l, L + 3, y + 9.4 + i * 4.2));
+    let ly = y + 9.4 + T.words.length * 4.2;
+    if (T.gstTableH) {                         // GST summary by rate
+      const gy0 = ly + 1;
+      font(7.6, 'bold', C.navy); doc.text('GST SUMMARY', L + 3, gy0 + 3);
+      const gc = B.inter
+        ? [['GST %', 18, 'left'], ['Taxable (₹)', 26, 'right'], ['IGST (₹)', 26, 'right'], ['Total Tax (₹)', 26, 'right']]
+        : [['GST %', 14, 'left'], ['Taxable (₹)', 22, 'right'], ['CGST (₹)', 20, 'right'], ['SGST (₹)', 20, 'right'], ['Total Tax (₹)', 22, 'right']];
+      let ty = gy0 + 5;
+      fill(C.navyLight); doc.rect(L + 3, ty, LW - 6, 4.4, 'F');
+      const colX = []; let gx = L + 3;
+      gc.forEach(c => { colX.push(gx); gx += c[1]; });
+      const gAt = (i) => gc[i][2] === 'right' ? colX[i] + gc[i][1] - 1.2 : colX[i] + 1.2;
+      font(7.2, 'bold', C.navy); gc.forEach((c, i) => text(c[0], gAt(i), ty + 3.1, c[2]));
+      ty += 4.4;
+      font(7.6, 'normal', C.ink);
+      B.summary.forEach(g => {
+        const vals = B.inter ? [`${r2(g.rate)}%`, fmt(g.taxable), fmt(g.igst), fmt(g.tax)]
+                             : [`${r2(g.rate)}%`, fmt(g.taxable), fmt(g.cgst), fmt(g.sgst), fmt(g.tax)];
+        vals.forEach((v, i) => doc.text(v, gAt(i), ty + 3, { align: gc[i][2] }));
+        ty += 4.2;
+      });
+      stroke([228, 232, 238], 0.15); doc.line(L + 3, ty, L + LW - 3, ty);
+      ly = gy0 + T.gstTableH - 1;
+    }
     if (T.notes.length) {
-      const ny = y + 9.4 + T.words.length * 4.2 + 2;
+      const ny = ly + 2;
       font(7.6, 'bold', C.navy); doc.text('TERMS & NOTES', L + 3, ny);
       font(8.2, 'normal', C.ink); T.notes.forEach((l, i) => doc.text(l, L + 3, ny + 4.4 + i * 3.8));
     }
@@ -695,18 +861,26 @@ function makePdfBlob() {
   }
   function signatures() {
     font(9, 'bold', C.navy); doc.text(`for ${BUSINESS.name}`, R, sigTop + 4, { align: 'right' });
-    stroke(C.ink, 0.25); doc.line(L, BOTTOM - 4.5, L + 55, BOTTOM - 4.5); doc.line(R - 55, BOTTOM - 4.5, R, BOTTOM - 4.5);
+    stroke(C.ink, 0.25); doc.line(R - 55, BOTTOM - 4.5, R, BOTTOM - 4.5);
     font(8.2, 'normal', C.muted);
-    doc.text("Receiver's Signature", L, BOTTOM - 0.8);
+    if (isQuote) {
+      font(8.2, 'italic', C.muted);
+      doc.text(`This quotation is for your information only and is not a bill.`, L, BOTTOM - 8);
+      doc.text(`Prices are valid till ${ddmmyyyy(f.validTill)}. Stock subject to availability.`, L, BOTTOM - 4);
+      font(8.2, 'normal', C.muted);
+    } else {
+      doc.line(L, BOTTOM - 4.5, L + 55, BOTTOM - 4.5);
+      doc.text("Receiver's Signature", L, BOTTOM - 0.8);
+    }
     doc.text('Authorised Signatory', R, BOTTOM - 0.8, { align: 'right' });
   }
 
   // ---- split items over pages; totals + signatures go on the last page ----
-  const T = totalsLayout();
+  const TL = totalsLayout();
   const bodyTop = header();                       // drawn once to measure; same height on every page
   const rowsTop = infoBoxes(bodyTop) + 4 + HEAD_H;
   const capFull = (BOTTOM - 6) - rowsTop;
-  const totalsTop = sigTop - 4 - T.h;
+  const totalsTop = sigTop - 4 - TL.h;
   const capLast = (totalsTop - 3) - rowsTop;
   const pages = [[]]; let used = 0;
   rows.forEach(r => {
@@ -728,10 +902,11 @@ function makePdfBlob() {
     const bottom = isLast ? totalsTop - 3 : BOTTOM - 6;
     tableBody(rowsTop, pageRows, bottom);
     stroke(C.line, 0.25); doc.rect(L, tableTop, W, bottom - tableTop, 'S');
-    if (isLast) { totals(totalsTop, T); signatures(); }
+    if (isLast) { totals(totalsTop, TL); signatures(); }
     else { font(8, 'italic', C.muted); doc.text('Continued on next page...', R, BOTTOM - 1.5, { align: 'right' }); }
     font(7, 'normal', C.muted);
-    doc.text('Thank you for your business!   |   This is a computer generated bill.', 105, 292, { align: 'center' });
+    doc.text(isQuote ? `Thank you for your enquiry!   |   ${BUSINESS.contact}`
+                     : 'Thank you for your business!   |   This is a computer generated bill.', 105, 292, { align: 'center' });
     if (pages.length > 1) doc.text(`Page ${p + 1} of ${pages.length}`, R, 292, { align: 'right' });
   });
   return doc.output('blob');
@@ -762,14 +937,25 @@ function toast(msg) {
 }
 
 // ---------- Preview window: shows the exact PDF, prints from it ----------
-let previewUrl = null;
+let previewUrl = null, previewBlob = null;
 function showPreview(blob, savedMsg) {
   if (previewUrl) URL.revokeObjectURL(previewUrl);
+  previewBlob = blob;
   previewUrl = URL.createObjectURL(blob);
-  document.getElementById('previewTitle').textContent = `Bill ${document.querySelector('[data-k="billNo"]').value}`;
+  document.getElementById('previewTitle').textContent = `${T().name} ${document.querySelector('[data-k="billNo"]').value}`;
   document.getElementById('previewSaved').textContent = savedMsg;
   document.getElementById('previewFrame').src = previewUrl + '#view=FitH';
   document.getElementById('preview').hidden = false;
+}
+// Send the PDF with WhatsApp / Email / etc. (Windows share window)
+async function sharePdf() {
+  const file = new File([previewBlob], pdfFileName(), { type: 'application/pdf' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: file.name, text: `${T().name} ${document.querySelector('[data-k="billNo"]').value} from ${BUSINESS.name}` }); }
+    catch (e) { if (e.name !== 'AbortError') alert('Sharing did not work here. Attach the saved PDF from your Bills folder instead.'); }
+  } else {
+    alert('This browser cannot share files directly.\nThe PDF is saved in your Bills folder - attach it from there in WhatsApp or email.');
+  }
 }
 function closePreview() { document.getElementById('preview').hidden = true; }
 function printPreview() {
@@ -791,9 +977,10 @@ async function printBill() {
     const root = await getBillsFolder();  // ask for the folder first, while the click still counts
     blob = makePdfBlob();
     if (root) {
-      const dir = await root.getDirectoryHandle(folder, { create: true });
+      const base = T().folder ? await root.getDirectoryHandle(T().folder, { create: true }) : root;
+      const dir = await base.getDirectoryHandle(folder, { create: true });
       await writeVerified(dir, name, blob);
-      savedMsg = `✔ Saved: ${root.name}\\${folder}\\${name}`;
+      savedMsg = `✔ Saved: ${[root.name, T().folder, folder, name].filter(Boolean).join('\\')}`;
     } else {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = `${folder}_${name}`; a.click();
@@ -830,17 +1017,16 @@ document.getElementById('sellerTagline').textContent = BUSINESS.tagline;
 document.getElementById('sellerAddress').innerHTML = BUSINESS.addressLines.map(l => `<span>${esc(l)}</span>`).join('');
 document.getElementById('sellerContact').textContent = BUSINESS.contact;
 
-let saved = null;
-try { saved = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) {}
-// Opening the app always uses today's date; a bill continues with its number, a fresh start gets the next one.
-if (saved && !saved.billOfSupply) { saved.cgst = 0; saved.sgst = 0; saved.igst = 0; }  // one-time switch from Tax Invoice
-apply({ ...(saved || {}), billDate: today(), billNo: (saved && saved.billNo) || nextInvoiceNo() });
-saveDraft(false);
+document.getElementById('tabs').innerHTML = Object.entries(DOC_TYPES)
+  .map(([k, t]) => `<button class="tab" data-type="${k}" onclick="switchType('${k}')">${t.tab}</button>`).join('');
+// Opening the app always uses today's date; a document continues with its number, a fresh start gets the next one.
+loadDraft();
 </script>
 <div id="preview" class="preview" hidden>
   <div class="preview-bar">
     <b id="previewTitle"></b>
     <span id="previewSaved"></span>
+    <button class="share" onclick="sharePdf()">📤 Share</button>
     <button class="primary" onclick="printPreview()">🖨️ Print</button>
     <button onclick="closePreview()">✕ Close</button>
   </div>
