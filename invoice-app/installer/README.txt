@@ -22,9 +22,14 @@ THE THREE TABS
                   Numbers: MST/26-27/0001 ...
 - Non-GST Bill  : Bill of Supply, no GST.          Numbers: MS/26-27/0001 ...
 - Quotation     : Price quote to send to customers.  Numbers: QT/26-27/0001 ...
-                  Saved in the "Quotations" folder. Use "Share" in the preview
-                  to send it on WhatsApp / email, and "Make Bill from Quote"
-                  to turn it into a bill.
+                  Saved in the "Quotations" folder. Use "Share PDF" to send it
+                  on WhatsApp / email, and "Make Bill from Quote" to turn it
+                  into a bill.
+
+SAVE PDF & PRINT
+  One click saves the PDF in your Bills folder (named with the customer
+  name) and then opens the print window. You do not need to save
+  anything from the print window - just print, or press Cancel.
 
 PDFs are saved with the customer name and number:
   <Bills folder>\01-11-2026\DEEPAK_MS-26-27-0001.pdf

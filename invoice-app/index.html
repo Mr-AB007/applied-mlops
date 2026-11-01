@@ -78,8 +78,14 @@
   .terms textarea { min-height: 50px; font-size: 12px; }
 
   /* ---------- Print ---------- */
-  @page { size: A4; margin: 8mm; }
+  @page { size: A4; margin: 0; }
+  #printArea { display: none; }
   @media print {
+    body.printing > *:not(#printArea) { display: none !important; }
+    body.printing #printArea { display: block; }
+    #printArea img { display: block; width: 210mm; height: 297mm; break-after: page; }
+    #printArea img:last-child { break-after: auto; }
+    body:not(.printing) .page { padding: 8mm !important; }
     body { background: #fff; }
     .toolbar, .no-print, .col-del { display: none !important; }
     .page { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
@@ -92,14 +98,6 @@
     input::placeholder, textarea::placeholder { color: transparent; }
   }
 
-  /* PDF preview window */
-  .preview { position: fixed; inset: 0; z-index: 50; background: rgba(15, 25, 45, .75); display: flex; flex-direction: column; }
-  .preview[hidden] { display: none; }
-  .preview-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 16px; background: #1f3b6e; color: #fff; }
-  .preview-bar #previewSaved { font-size: 13px; opacity: .9; margin-right: auto; }
-  .preview-bar button { border: 0; border-radius: 4px; padding: 8px 14px; font-weight: bold; cursor: pointer; font-size: 14px; }
-  .preview-bar button.primary { background: #4caf50; color: #fff; }
-  .preview iframe { flex: 1; border: 0; background: #525659; }
   .toolbar button:disabled { opacity: .7; cursor: wait; }
 
   [hidden] { display: none !important; }
@@ -138,7 +136,6 @@
   .dlg-box .dlg-main:hover { background: #29497f; }
   .dlg-sub { font-size: 12px; color: #666; margin-top: 6px; }
   .dlg-box .dlg-cancel { background: none; border: 0; color: #666; text-align: center; font-weight: normal; }
-  .preview-bar button.share { background: #25d366; color: #fff; }
 
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #23324a; color: #fff;
            padding: 10px 16px; border-radius: 6px; font-size: 13px; box-shadow: 0 2px 10px rgba(0,0,0,.3); z-index: 99; }
@@ -152,6 +149,7 @@
   <h1 class="brand"><span class="logo"></span>MITRSETU Billing</h1>
   <button class="primary" id="printBtn" onclick="printBill()">🖨️ Save PDF &amp; Print</button>
   <button onclick="chooseBillsFolder()">📁 Bills Folder</button>
+  <button onclick="sharePdf()">📤 Share PDF</button>
   <span class="folder" id="folderName"></span>
   <button onclick="saveDraft(true)">💾 Save</button>
   <button onclick="newBill()" id="newBtn">📄 New Bill</button>
@@ -293,7 +291,7 @@ const DOC_TYPES = {
             party: 'QUOTATION FOR', details: 'QUOTATION DETAILS', screenParty: 'Quotation for (Customer)',
             store: 'invoiceMaker.doc.quote', counter: 'invoiceMaker.counter.quote', folder: 'Quotations' },
 };
-const APP_VERSION = '2026.11.01-3';
+const APP_VERSION = '2026.11.01-4';
 const TYPE_KEY = 'invoiceMaker.docType';
 const QUOTE_VALID_DAYS = 15;
 let docType = 'nongst';
@@ -659,7 +657,9 @@ const loadFolder = () => idb('readonly', st => st.get('billsFolder')).catch(() =
 const storeFolder = h => idb('readwrite', st => st.put(h, 'billsFolder')).catch(() => {});
 
 function showFolderName(h) {
-  document.getElementById('folderName').textContent = h ? `Saving to: ${h.name}` : '';
+  const el = document.getElementById('folderName');
+  el.textContent = h ? `📂 Saving to: ${h.name}` : '⚠ No Bills folder chosen yet';
+  el.style.color = h ? '' : '#ffc107';
 }
 
 async function chooseBillsFolder() {
@@ -705,12 +705,95 @@ function billData() {
   return { f, ...computeBill(f, gstOn(f)) };
 }
 
+const FONT_FILES = [['Lib-Regular.ttf', 'Lib', 'normal'], ['Lib-Bold.ttf', 'Lib', 'bold'], ['Lib-Italic.ttf', 'Lib', 'italic'],
+                    ['Rupee-Regular.ttf', 'Rupee', 'normal'], ['Rupee-Bold.ttf', 'Rupee', 'bold']];
+function newPdfDoc() {
+  const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  FONT_FILES.forEach(([file, fam, style]) => { pdf.addFileToVFS(file, window.PDF_FONTS[file]); pdf.addFont(file, fam, style); });
+  return pdf;
+}
 function makePdfBlob() {
-  const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
-  [['Lib-Regular.ttf', 'Lib', 'normal'], ['Lib-Bold.ttf', 'Lib', 'bold'], ['Lib-Italic.ttf', 'Lib', 'italic'],
-   ['Rupee-Regular.ttf', 'Rupee', 'normal'], ['Rupee-Bold.ttf', 'Rupee', 'bold']].forEach(([file, fam, style]) => {
-    doc.addFileToVFS(file, window.PDF_FONTS[file]); doc.addFont(file, fam, style);
-  });
+  const pdf = newPdfDoc();
+  drawBill(pdf);
+  return pdf.output('blob');
+}
+
+// ---- Print pages: the same drawing, painted onto 300-dpi page images (so paper looks exactly like the PDF) ----
+let canvasReady = null;
+function loadCanvasAssets() {
+  if (!canvasReady) canvasReady = (async () => {
+    const faces = FONT_FILES.map(([file, fam, style]) => {
+      const bin = atob(window.PDF_FONTS[file]), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new FontFace('Pdf' + fam, bytes, { weight: style === 'bold' ? '700' : '400', style: style === 'italic' ? 'italic' : 'normal' });
+    });
+    await Promise.all(faces.map(f => f.load()));
+    faces.forEach(f => document.fonts.add(f));
+    const images = {};
+    if (window.BRAND_LOGO) { const img = new Image(); img.src = window.BRAND_LOGO; await img.decode(); images[window.BRAND_LOGO] = img; }
+    return images;
+  })();
+  return canvasReady;
+}
+function canvasDoc(images, pxPerMm) {
+  const pages = []; let ctx;
+  const st = { fam: 'Lib', style: 'normal', size: 10, text: '#000', fill: '#000', draw: '#000', lw: 0.2, alpha: 1 };
+  const rgb = a => `rgb(${a[0]},${a[1]},${a[2]})`;
+  const page = () => {
+    const c = document.createElement('canvas');
+    c.width = Math.round(210 * pxPerMm); c.height = Math.round(297 * pxPerMm);
+    ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.scale(pxPerMm, pxPerMm);
+    pages.push(c);
+  };
+  const paint = style => {
+    style = style || 'S'; ctx.globalAlpha = st.alpha;
+    if (/F/.test(style)) { ctx.fillStyle = st.fill; ctx.fill(); }
+    if (/D|S/.test(style)) { ctx.strokeStyle = st.draw; ctx.lineWidth = st.lw; ctx.stroke(); }
+  };
+  page();
+  return {
+    pages,
+    addPage() { page(); },
+    setFont(fam, style) { st.fam = fam; st.style = style || 'normal'; },
+    setFontSize(size) { st.size = size; },
+    setTextColor(...c) { st.text = rgb(c); },
+    setFillColor(...c) { st.fill = rgb(c); },
+    setDrawColor(...c) { st.draw = rgb(c); },
+    setLineWidth(w) { st.lw = w; },
+    setGState(gs) { st.alpha = gs && gs.opacity !== undefined ? gs.opacity : 1; },
+    text(str, x, y, opts = {}) {
+      ctx.font = `${st.style === 'italic' ? 'italic ' : ''}${st.style === 'bold' ? '700' : '400'} ${st.size * 25.4 / 72}px Pdf${st.fam}`;
+      ctx.fillStyle = st.text; ctx.globalAlpha = st.alpha; ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = opts.align === 'right' ? 'right' : opts.align === 'center' ? 'center' : 'left';
+      [].concat(str).forEach((l, i) => ctx.fillText(String(l), x, y + i * st.size * 1.15 * 25.4 / 72));
+    },
+    rect(x, y, w, h, style) { ctx.beginPath(); ctx.rect(x, y, w, h); paint(style); },
+    roundedRect(x, y, w, h, rx, ry, style) { ctx.beginPath(); ctx.roundRect(x, y, w, h, rx); paint(style); },
+    line(x1, y1, x2, y2) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); paint('S'); },
+    lines(deltas, x, y, scale, style, closed) {
+      ctx.beginPath(); ctx.moveTo(x, y);
+      deltas.forEach(([dx, dy]) => { x += dx; y += dy; ctx.lineTo(x, y); });
+      if (closed) ctx.closePath(); paint(style);
+    },
+    addImage(data, fmt, x, y, w, h) { const img = images[data]; if (img) { ctx.globalAlpha = st.alpha; ctx.drawImage(img, x, y, w, h); } },
+  };
+}
+// Sends every drawing call to both the PDF and the print pages; sizes and line-wrapping come from the PDF.
+function teeDoc(pdf, cv) {
+  const tee = { GState: pdf.GState };
+  ['addPage', 'setFont', 'setFontSize', 'setTextColor', 'setFillColor', 'setDrawColor', 'setLineWidth', 'setGState',
+   'text', 'rect', 'roundedRect', 'line', 'lines', 'addImage'].forEach(m => { tee[m] = (...a) => { pdf[m](...a); cv[m](...a); return tee; }; });
+  ['getTextWidth', 'splitTextToSize', 'getFont', 'setProperties'].forEach(m => { tee[m] = (...a) => pdf[m](...a); });
+  return tee;
+}
+async function makeBillForPrint() {
+  const images = await loadCanvasAssets();
+  const pdf = newPdfDoc(), cv = canvasDoc(images, 300 / 25.4);
+  drawBill(teeDoc(pdf, cv));
+  return { blob: pdf.output('blob'), pages: cv.pages };
+}
+
+function drawBill(doc) {
 
   const B = billData(), f = B.f, DT = T(), isQuote = docType === 'quote';
   doc.setProperties({ title: pdfFileName().replace(/\.pdf$/i, ''), subject: `${BUSINESS.name} ${DT.name} ${f.billNo || ''}`, author: BUSINESS.name, creator: 'MITRSETU Billing',
@@ -983,7 +1066,6 @@ function makePdfBlob() {
                      : 'Thank you for your business!   |   This is a computer generated bill.', 105, 292, { align: 'center' });
     if (pages.length > 1) doc.text(`Page ${p + 1} of ${pages.length}`, R, 292, { align: 'right' });
   });
-  return doc.output('blob');
 }
 
 // Write the file, then read it back to make sure the whole PDF is on disk.
@@ -1010,20 +1092,10 @@ function toast(msg) {
   setTimeout(() => t.remove(), 6000);
 }
 
-// ---------- Preview window: shows the exact PDF, prints from it ----------
-let previewUrl = null, previewBlob = null;
-function showPreview(blob, savedMsg) {
-  if (previewUrl) URL.revokeObjectURL(previewUrl);
-  previewBlob = blob;
-  previewUrl = URL.createObjectURL(blob);
-  document.getElementById('previewTitle').textContent = `${T().name} ${document.querySelector('[data-k="billNo"]').value}`;
-  document.getElementById('previewSaved').textContent = savedMsg;
-  document.getElementById('previewFrame').src = previewUrl + '#view=FitH';
-  document.getElementById('preview').hidden = false;
-}
 // Send the PDF with WhatsApp / Email / etc. (Windows share window)
 async function sharePdf() {
-  const file = new File([previewBlob], pdfFileName(), { type: 'application/pdf' });
+  recalc(); saveDraft(false);
+  const file = new File([makePdfBlob()], pdfFileName(), { type: 'application/pdf' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title: file.name, text: `${T().name} ${document.querySelector('[data-k="billNo"]').value} from ${BUSINESS.name}` }); }
     catch (e) { if (e.name !== 'AbortError') alert('Sharing did not work here. Attach the saved PDF from your Bills folder instead.'); }
@@ -1031,11 +1103,23 @@ async function sharePdf() {
     alert('This browser cannot share files directly.\nThe PDF is saved in your Bills folder - attach it from there in WhatsApp or email.');
   }
 }
-function closePreview() { document.getElementById('preview').hidden = true; }
-function printPreview() {
-  const fr = document.getElementById('previewFrame');
-  try { fr.contentWindow.focus(); fr.contentWindow.print(); }
-  catch (e) { window.open(previewUrl, '_blank'); }
+
+// Put the page images in the print area and open the print window.
+async function printPages(pages, name) {
+  const area = document.getElementById('printArea');
+  area.innerHTML = '';
+  for (const c of pages) {
+    const img = new Image();
+    img.src = c.toDataURL('image/png');
+    await img.decode();
+    area.appendChild(img);
+  }
+  const oldTitle = document.title;
+  document.title = name.replace(/\.pdf$/i, '');     // if "Save as PDF" is picked in the print window, it gets this name
+  document.body.classList.add('printing');
+  const done = () => { document.body.classList.remove('printing'); area.innerHTML = ''; document.title = oldTitle; };
+  window.addEventListener('afterprint', done, { once: true });
+  window.print();
 }
 
 let busy = false;
@@ -1046,40 +1130,35 @@ async function printBill() {
   btn.disabled = true; btn.textContent = '⏳ Saving...';
   recalc(); saveDraft(false);
   const folder = dateFolderName(), name = pdfFileName();
-  let blob = null, savedMsg = '';
+  let made = null;
   try {
     const root = await getBillsFolder();  // ask for the folder first, while the click still counts
-    blob = makePdfBlob();
+    made = await makeBillForPrint();
     if (root) {
       const base = T().folder ? await root.getDirectoryHandle(T().folder, { create: true }) : root;
       const dir = await base.getDirectoryHandle(folder, { create: true });
-      await writeVerified(dir, name, blob);
-      savedMsg = `✔ Saved: ${[root.name, T().folder, folder, name].filter(Boolean).join('\\')}`;
+      await writeVerified(dir, name, made.blob);
+      toast(`✔ PDF saved: ${[root.name, T().folder, folder, name].filter(Boolean).join('\\')}`);
     } else {
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = name; a.click();
+      a.href = URL.createObjectURL(made.blob); a.download = name; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-      savedMsg = `✔ Saved to Downloads: ${name}`;
+      toast(`✔ PDF saved to Downloads: ${name}`);
     }
-    toast(savedMsg);
   } catch (e) {
     console.error(e);
-    savedMsg = '⚠ PDF NOT saved: ' + e.message;
-    alert('The PDF could not be saved (' + e.message + ').\nPlease click "Save PDF & Print" again.');
+    alert('The PDF could not be saved (' + e.message + ').\nThe print window will still open. Click "Save PDF & Print" again to retry saving.');
   } finally {
     busy = false; btn.disabled = false; btn.innerHTML = label;
   }
-  if (blob) showPreview(blob, savedMsg);
+  if (made) await printPages(made.pages, name);
   else { const t = document.title; document.title = name.replace(/\.pdf$/i, ''); window.print(); document.title = t; }
 }
 
-// Ctrl+P also saves the PDF; Esc closes the preview
+// Ctrl+P = Save PDF & Print; Esc closes the open-bill window
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
-    e.preventDefault();
-    if (!document.getElementById('preview').hidden) printPreview(); else printBill();
-  }
-  if (e.key === 'Escape') { closePreview(); document.getElementById('openDlg').hidden = true; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); printBill(); }
+  if (e.key === 'Escape') document.getElementById('openDlg').hidden = true;
 });
 loadFolder().then(showFolderName);
 
@@ -1126,16 +1205,7 @@ loadDraft();
     <button class="dlg-cancel" onclick="openAction('cancel')">Cancel</button>
   </div>
 </div>
-<div id="preview" class="preview" hidden>
-  <div class="preview-bar">
-    <b id="previewTitle"></b>
-    <span id="previewSaved"></span>
-    <button class="share" onclick="sharePdf()">📤 Share</button>
-    <button class="primary" onclick="printPreview()">🖨️ Print</button>
-    <button onclick="closePreview()">✕ Close</button>
-  </div>
-  <iframe id="previewFrame" title="Bill preview"></iframe>
-</div>
+<div id="printArea"></div>
 
 <!-- vendor/pdf-fonts.js -->
 <script>

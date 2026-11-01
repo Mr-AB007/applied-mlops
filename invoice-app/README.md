@@ -18,7 +18,9 @@ Run it again to update the app (drafts, numbers and settings are kept). **UNINST
 
 ## Using it
 - Type your GSTIN once at the top (it is remembered).
-- **Save PDF & Print** saves the PDF, checks that the whole file was written, then shows a preview with **Print** and **Share** (WhatsApp / email).
+- **Save PDF & Print** (or Ctrl+P) saves the PDF straight into the Bills folder, checks that the whole file was written, then opens
+  Chrome's print window. The printed page is drawn by the same code as the PDF, so the two look the same.
+- **📤 Share PDF** sends the bill with WhatsApp / email (Windows share window).
 - PDFs go to `<Bills folder>\DD-MM-YYYY\<customer>_<number>.pdf`, and quotations to `<Bills folder>\Quotations\DD-MM-YYYY\<customer>_<number>.pdf`.
 - **📂 Open Bill (PDF)**: every PDF carries the bill's data (in its Keywords field). Opening one fills everything in again,
   either to correct and reprint it (same number) or as a new GST bill, Non-GST bill or quotation (next number). `.json` files open too.
