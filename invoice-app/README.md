@@ -21,7 +21,7 @@ Run it again to update the app (drafts, numbers and settings are kept). **UNINST
 - **Save PDF & Print** (or Ctrl+P) saves the PDF straight into the Bills folder, checks that the whole file was written, then opens
   Chrome's print window. The printed page is drawn by the same code as the PDF, so the two look the same.
 - **📤 Share PDF** sends the bill with WhatsApp / email (Windows share window).
-- PDFs go to `<Bills folder>\DD-MM-YYYY\<customer>_<number>.pdf`, and quotations to `<Bills folder>\Quotations\DD-MM-YYYY\<customer>_<number>.pdf`.
+- PDFs go to `<Bills folder>\GST Bills\`, `<Bills folder>\Non-GST Bills\` or `<Bills folder>\Quotations\`, each with a `DD-MM-YYYY` folder inside, named `<customer>_<number>.pdf`.
 - **📂 Open Bill (PDF)**: every PDF carries the bill's data (in its Keywords field). Opening one fills everything in again,
   either to correct and reprint it (same number) or as a new GST bill, Non-GST bill or quotation (next number). `.json` files open too.
 - Product names are typed in CAPITALS. Number boxes have no arrows and ignore the mouse wheel.

@@ -32,7 +32,8 @@ SAVE PDF & PRINT
   anything from the print window - just print, or press Cancel.
 
 PDFs are saved with the customer name and number:
-  <Bills folder>\01-11-2026\DEEPAK_MS-26-27-0001.pdf
+  <Bills folder>\GST Bills\01-11-2026\SHARMA ELECTRICALS_MST-26-27-0001.pdf
+  <Bills folder>\Non-GST Bills\01-11-2026\DEEPAK_MS-26-27-0001.pdf
   <Bills folder>\Quotations\01-11-2026\RAHUL KUMAR_QT-26-27-0001.pdf
 
 OPEN A SAVED BILL

@@ -283,15 +283,15 @@ const BUSINESS = {
 const DOC_TYPES = {
   gst:    { tab: '🧾 GST Invoice', name: 'GST Invoice', title: 'TAX INVOICE', noLabel: 'Invoice No.', prefix: 'MST', gst: true,
             party: 'BILLED TO', details: 'INVOICE DETAILS', screenParty: 'Billed to (Customer)',
-            store: 'invoiceMaker.doc.gst', counter: 'invoiceMaker.counter.gst', folder: '' },
+            store: 'invoiceMaker.doc.gst', counter: 'invoiceMaker.counter.gst', folder: 'GST Bills' },
   nongst: { tab: '📄 Non-GST Bill', name: 'Non-GST Bill', title: 'BILL OF SUPPLY', noLabel: 'Invoice No.', prefix: 'MS', gst: false,
             party: 'BILLED TO', details: 'INVOICE DETAILS', screenParty: 'Billed to (Customer)',
-            store: 'invoiceMaker.v2', counter: 'invoiceMaker.counter', folder: '' },
+            store: 'invoiceMaker.v2', counter: 'invoiceMaker.counter', folder: 'Non-GST Bills' },
   quote:  { tab: '💬 Quotation', name: 'Quotation', title: 'QUOTATION', noLabel: 'Quotation No.', prefix: 'QT', gst: 'optional',
             party: 'QUOTATION FOR', details: 'QUOTATION DETAILS', screenParty: 'Quotation for (Customer)',
             store: 'invoiceMaker.doc.quote', counter: 'invoiceMaker.counter.quote', folder: 'Quotations' },
 };
-const APP_VERSION = '2026.11.01-4';
+const APP_VERSION = '2026.11.01-5';
 const TYPE_KEY = 'invoiceMaker.docType';
 const QUOTE_VALID_DAYS = 15;
 let docType = 'nongst';
