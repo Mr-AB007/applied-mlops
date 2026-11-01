@@ -26,10 +26,10 @@ THE THREE TABS
                   on WhatsApp / email, and "Make Bill from Quote" to turn it
                   into a bill.
 
-SAVE PDF & PRINT
-  One click saves the PDF in your Bills folder (named with the customer
-  name) and then opens the print window. You do not need to save
-  anything from the print window - just print, or press Cancel.
+SAVE PDF  /  PRINT
+  "Save PDF" (Ctrl+S) saves the PDF in your Bills folder, named with the
+  customer name. "Print" (Ctrl+P) opens the print window. They are
+  separate - click Save PDF for every bill you want to keep.
 
 PDFs are saved with the customer name and number:
   <Bills folder>\GST Bills\01-11-2026\SHARMA ELECTRICALS_MST-26-27-0001.pdf

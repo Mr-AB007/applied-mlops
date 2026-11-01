@@ -98,6 +98,7 @@
     input::placeholder, textarea::placeholder { color: transparent; }
   }
 
+  .toolbar button.print { background: #1976d2; }
   .toolbar button:disabled { opacity: .7; cursor: wait; }
 
   [hidden] { display: none !important; }
@@ -147,11 +148,11 @@
 
 <div class="toolbar">
   <h1 class="brand"><span class="logo"></span>MITRSETU Billing</h1>
-  <button class="primary" id="printBtn" onclick="printBill()">🖨️ Save PDF &amp; Print</button>
+  <button class="primary" id="saveBtn" onclick="savePdf()">💾 Save PDF</button>
+  <button class="primary print" id="printBtn" onclick="printBill()">🖨️ Print</button>
   <button onclick="chooseBillsFolder()">📁 Bills Folder</button>
   <button onclick="sharePdf()">📤 Share PDF</button>
   <span class="folder" id="folderName"></span>
-  <button onclick="saveDraft(true)">💾 Save</button>
   <button onclick="newBill()" id="newBtn">📄 New Bill</button>
   <button onclick="setNextNumber()">🔢 Set Number</button>
   <details class="menu quote-only" id="convertMenu">
@@ -161,7 +162,6 @@
       <button onclick="convertQuote('nongst')">📄 Non-GST Bill</button>
     </div>
   </details>
-  <button onclick="exportJSON()">⬇️ Export File</button>
   <label class="btn">📂 Open Bill (PDF)<input type="file" accept=".pdf,.json" hidden onchange="openBillFile(this)"></label>
   <span class="hint">Blue boxes can be edited. Price and totals are worked out for you. &nbsp;<b id="appVersion"></b></span>
 </div>
@@ -291,7 +291,7 @@ const DOC_TYPES = {
             party: 'QUOTATION FOR', details: 'QUOTATION DETAILS', screenParty: 'Quotation for (Customer)',
             store: 'invoiceMaker.doc.quote', counter: 'invoiceMaker.counter.quote', folder: 'Quotations' },
 };
-const APP_VERSION = '2026.11.01-5';
+const APP_VERSION = '2026.11.01-6';
 const TYPE_KEY = 'invoiceMaker.docType';
 const QUOTE_VALID_DAYS = 15;
 let docType = 'nongst';
@@ -626,16 +626,6 @@ function openAction(act) {
     newFrom(d, act);
     toast(`New ${T().name} ${document.querySelector('[data-k="billNo"]').value} filled from ${d.billNo}`);
   }
-}
-
-function exportJSON() {
-  const d = collect();
-  const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${docType === 'quote' ? 'quotation' : 'bill'}-${(d.billNo || 'draft').replace(/[^\w-]+/g, '_')}-${(d.custName || 'customer').replace(/[^\w-]+/g, '_')}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
 }
 
 // ---------- Save PDF into <Bills folder>\<DD-MM-YYYY>\<invoice no>.pdf ----------
@@ -1122,42 +1112,57 @@ async function printPages(pages, name) {
   window.print();
 }
 
+// Buttons show "working" while busy and ignore extra clicks.
 let busy = false;
-async function printBill() {
-  if (busy) return;                       // ignore double clicks while saving
+async function whileBusy(btnId, label, job) {
+  if (busy) return;
   busy = true;
-  const btn = document.getElementById('printBtn'), label = btn.innerHTML;
-  btn.disabled = true; btn.textContent = '⏳ Saving...';
-  recalc(); saveDraft(false);
-  const folder = dateFolderName(), name = pdfFileName();
-  let made = null;
-  try {
-    const root = await getBillsFolder();  // ask for the folder first, while the click still counts
-    made = await makeBillForPrint();
-    if (root) {
-      const base = T().folder ? await root.getDirectoryHandle(T().folder, { create: true }) : root;
-      const dir = await base.getDirectoryHandle(folder, { create: true });
-      await writeVerified(dir, name, made.blob);
-      toast(`✔ PDF saved: ${[root.name, T().folder, folder, name].filter(Boolean).join('\\')}`);
-    } else {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(made.blob); a.download = name; a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-      toast(`✔ PDF saved to Downloads: ${name}`);
-    }
-  } catch (e) {
-    console.error(e);
-    alert('The PDF could not be saved (' + e.message + ').\nThe print window will still open. Click "Save PDF & Print" again to retry saving.');
-  } finally {
-    busy = false; btn.disabled = false; btn.innerHTML = label;
-  }
-  if (made) await printPages(made.pages, name);
-  else { const t = document.title; document.title = name.replace(/\.pdf$/i, ''); window.print(); document.title = t; }
+  const btn = document.getElementById(btnId), html = btn.innerHTML;
+  btn.disabled = true; btn.textContent = label;
+  try { recalc(); saveDraft(false); await job(); }
+  finally { busy = false; btn.disabled = false; btn.innerHTML = html; }
 }
 
-// Ctrl+P = Save PDF & Print; Esc closes the open-bill window
+// 💾 Save PDF: <Bills folder>\<GST Bills | Non-GST Bills | Quotations>\<DD-MM-YYYY>\<customer>_<number>.pdf
+function savePdf() {
+  return whileBusy('saveBtn', '⏳ Saving...', async () => {
+    const folder = dateFolderName(), name = pdfFileName();
+    try {
+      const root = await getBillsFolder();  // ask for the folder first, while the click still counts
+      const blob = makePdfBlob();
+      if (root) {
+        const base = T().folder ? await root.getDirectoryHandle(T().folder, { create: true }) : root;
+        const dir = await base.getDirectoryHandle(folder, { create: true });
+        await writeVerified(dir, name, blob);
+        toast(`✔ PDF saved: ${[root.name, T().folder, folder, name].filter(Boolean).join('\\')}`);
+      } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = name; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        toast(`✔ PDF saved to Downloads: ${name}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('The PDF could not be saved (' + e.message + ').\nPlease click "Save PDF" again.');
+    }
+  });
+}
+
+// 🖨️ Print: opens the print window with the same design as the PDF (does not save a file).
+function printBill() {
+  return whileBusy('printBtn', '⏳ Preparing...', async () => {
+    const name = pdfFileName();
+    let made = null;
+    try { made = await makeBillForPrint(); } catch (e) { console.error(e); }
+    if (made) await printPages(made.pages, name);
+    else { const t = document.title; document.title = name.replace(/\.pdf$/i, ''); window.print(); document.title = t; }
+  });
+}
+
+// Ctrl+P = Print, Ctrl+S = Save PDF; Esc closes the open-bill window
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); printBill(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); savePdf(); }
   if (e.key === 'Escape') document.getElementById('openDlg').hidden = true;
 });
 loadFolder().then(showFolderName);
